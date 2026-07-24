@@ -405,24 +405,26 @@ const Calculations = {
     const result = this.trapezoidCalc(a, b, c, d);
     if (result.errors) return result;
 
-    const { h, x1, x2 } = result;
+    const { h } = result;
     const leftBottomX = 0;
     const leftTopX = result.leftTopX;
+    const rightTopXBase = leftTopX + a;
+    const rightBottomXBase = b;
+    const slopeLeft = (leftBottomX - leftTopX) / h;
+    const slopeRight = (rightBottomXBase - rightTopXBase) / h;
 
     const sections = [];
     let cumH = 0;
 
     for (let i = 0; i < slants.length; i++) {
       const { ci, di } = slants[i];
-      const hFromC = ci * h / c;
-      const hFromD = di * h / d;
-      const secH = (hFromC + hFromD) / 2;
+      const secH = ci * h / c;
 
       const yTop = cumH;
       const yBottom = cumH + secH;
 
       if (yBottom > h + 0.01) {
-        return { errors: [`القسم ${i + 1}: مجموع الارتفاعات المحسوبة (${Math.round(yBottom * 1000) / 1000} م) يتجاوز الارتفاع الكلي (${h} م)`] };
+        return { errors: [`القسم ${i + 1}: مجموع الارتفاعات (${Math.round(yBottom * 1000) / 1000} م) يتجاوز الارتفاع الكلي (${h} م)`] };
       }
 
       const wTop = this.widthAtHeight(h, a, b, yTop);
@@ -435,8 +437,8 @@ const Calculations = {
 
       const secA = wTop;
       const secB = wBottom;
-      const secC = Math.sqrt(secH * secH + Math.pow(rightBottomXPos - rightTopXPos, 2));
-      const secD = Math.sqrt(secH * secH + Math.pow(leftBottomXPos - leftTopXPos, 2));
+      const secC = Math.round(secH * c / h * 1000) / 1000;
+      const secD = Math.round(secH * d / h * 1000) / 1000;
 
       const secArea = ((secA + secB) / 2) * secH;
       const secDiag1 = Math.sqrt(secA * secA + Math.pow(leftBottomXPos - leftTopXPos, 2) + secH * secH);
@@ -444,10 +446,12 @@ const Calculations = {
 
       sections.push({
         index: i + 1,
+        inputCi: ci,
+        inputDi: di,
         a: Math.round(secA * 1000) / 1000,
         b: Math.round(secB * 1000) / 1000,
-        c: Math.round(secC * 1000) / 1000,
-        d: Math.round(secD * 1000) / 1000,
+        c: secC,
+        d: secD,
         h: Math.round(secH * 1000) / 1000,
         areaM2: Math.round(secArea * 1000) / 1000,
         diag1: Math.round(secDiag1 * 1000) / 1000,
@@ -582,28 +586,30 @@ const Calculations = {
 
     for (let i = 0; i < slants.length; i++) {
       const { ci, di } = slants[i];
-      const hFromC = ci * h / c;
-      const hFromD = di * h / d;
-      const secH = (hFromC + hFromD) / 2;
+      const secH = ci * h / b;
 
       const yTop = cumH;
       const yBottom = cumH + secH;
 
       if (yBottom > h + 0.01) {
-        return { errors: [`القسم ${i + 1}: مجموع الارتفاعات المحسوبة (${Math.round(yBottom * 1000) / 1000} م) يتجاوز الارتفاع الكلي (${h} م)`] };
+        return { errors: [`القسم ${i + 1}: مجموع الارتفاعات (${Math.round(yBottom * 1000) / 1000} م) يتجاوز الارتفاع الكلي (${h} م)`] };
       }
 
       const wTop = this.widthAtHeight(h, a, c, yTop);
       const wBottom = this.widthAtHeight(h, a, c, yBottom);
       const secArea = ((wTop + wBottom) / 2) * secH;
       const secDiag = diag1 * secH / h;
+      const secB = Math.round(secH * b / h * 1000) / 1000;
+      const secD = Math.round(secH * d / h * 1000) / 1000;
 
       sections.push({
         index: i + 1,
+        inputCi: ci,
+        inputDi: di,
         a: Math.round(wTop * 1000) / 1000,
         b: Math.round(wBottom * 1000) / 1000,
-        c: Math.round(secDiag * 1000) / 1000,
-        d: Math.round(secDiag * 1000) / 1000,
+        c: secB,
+        d: secD,
         h: Math.round(secH * 1000) / 1000,
         areaM2: Math.round(secArea * 1000) / 1000,
         diag1: Math.round(secDiag * 1000) / 1000,
@@ -755,13 +761,13 @@ const Calculations = {
 
     for (let i = 0; i < slants.length; i++) {
       const { ci, di } = slants[i];
-      const secH = (ci + di) / 2;
+      const secH = ci * totalH / b;
 
       const yTop = cumH;
       const yBottom = cumH + secH;
 
       if (yBottom > totalH + 0.01) {
-        return { errors: [`القسم ${i + 1}: مجموع الارتفاعات المحسوبة (${Math.round(yBottom * 1000) / 1000} م) يتجاوز الارتفاع الكلي (${Math.round(totalH * 1000) / 1000} م)`] };
+        return { errors: [`القسم ${i + 1}: مجموع الارتفاعات (${Math.round(yBottom * 1000) / 1000} م) يتجاوز الارتفاع الكلي (${Math.round(totalH * 1000) / 1000} م)`] };
       }
 
       const fracTop = yTop / totalH;
@@ -773,13 +779,17 @@ const Calculations = {
       const secH1 = h1 * secH / totalH;
       const secH2 = h2 * secH / totalH;
       const secDiag = diagN * secH / totalH;
+      const secB = Math.round(secH * b / totalH * 1000) / 1000;
+      const secD = Math.round(secH * d / totalH * 1000) / 1000;
 
       sections.push({
         index: i + 1,
+        inputCi: ci,
+        inputDi: di,
         a: Math.round(wTop * 1000) / 1000,
         b: Math.round(wBottom * 1000) / 1000,
-        c: Math.round(secDiag * 1000) / 1000,
-        d: Math.round(secDiag * 1000) / 1000,
+        c: secB,
+        d: secD,
         h: Math.round(secH * 1000) / 1000,
         areaM2: Math.round(secArea * 1000) / 1000,
         diag1: Math.round(secDiag * 1000) / 1000,

@@ -163,11 +163,11 @@
       remaining.style.display = 'block';
       remaining.innerHTML = `
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-          <span>المتبقي من الضلع الأيمن (c): <strong style="color:${Math.abs(remainingC) < 0.001 ? 'var(--primary)' : remainingC < 0 ? '#d32f2f' : 'var(--text-primary)'}">${Math.round(remainingC * 1000) / 1000} م</strong></span>
-          <span>المتبقي من الضلع الأيسر (d): <strong style="color:${Math.abs(remainingD) < 0.001 ? 'var(--primary)' : remainingD < 0 ? '#d32f2f' : 'var(--text-primary)'}">${Math.round(remainingD * 1000) / 1000} م</strong></span>
+          <span>المتبقي من الضلع الأيمن (c=${lastResult.c}): <strong style="color:${Math.abs(remainingC) < 0.001 ? 'var(--primary)' : remainingC < 0 ? '#d32f2f' : 'var(--text-primary)'}">${Math.round(remainingC * 1000) / 1000} م</strong></span>
+          <span>المتبقي من الضلع الأيسر (d=${lastResult.d}): <strong style="color:${Math.abs(remainingD) < 0.001 ? 'var(--primary)' : remainingD < 0 ? '#d32f2f' : 'var(--text-primary)'}">${Math.round(remainingD * 1000) / 1000} م</strong></span>
         </div>
         <div style="margin-top:0.3rem;font-size:0.85rem;color:#999;">
-          ${(ciVals.length !== diVals.length) ? '⚠️ عدد قيم ci وdi غير متساوٍ - سيتم استخدام القيم المتاحة' : (Math.abs(remainingC) < 0.001 && Math.abs(remainingD) < 0.001) ? '✓ تم استخدام كامل الأضلاع' : ''}
+          ${Math.abs(remainingC) < 0.001 && Math.abs(remainingD) < 0.001 ? '✓ تم استخدام كامل الأضلاع' : remainingC < 0 || remainingD < 0 ? '⚠️ تجاوز طول الضلع' : ''}
         </div>
       `;
     }
@@ -220,8 +220,8 @@
               <div class="result-item"><div class="label">بالوحدات</div><div class="value">${sec.units.display}</div></div>
               <div class="result-item"><div class="label">القاعدة العلوية</div><div class="value">${sec.a} <span class="unit">م</span></div></div>
               <div class="result-item"><div class="label">القاعدة السفلية</div><div class="value">${sec.b} <span class="unit">م</span></div></div>
-              <div class="result-item"><div class="label">الضلع الأيمن</div><div class="value">${sec.c} <span class="unit">م</span></div></div>
-              <div class="result-item"><div class="label">الضلع الأيسر</div><div class="value">${sec.d} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الضلع الأيمن (ci)</div><div class="value">${sec.c} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الضلع الأيسر (di)</div><div class="value">${sec.d} <span class="unit">م</span></div></div>
               <div class="result-item"><div class="label">الارتفاع</div><div class="value">${sec.h} <span class="unit">م</span></div></div>
               <div class="result-item"><div class="label">القطر الأول</div><div class="value">${sec.diag1} <span class="unit">م</span></div></div>
               <div class="result-item"><div class="label">القطر الثاني</div><div class="value">${sec.diag2} <span class="unit">م</span></div></div>
