@@ -247,8 +247,8 @@ const Calculations = {
   },
 
   interpolateEdge(edgeTopX, edgeBottomX, hTotal, y) {
-    if (hTotal === 0) return edgeBottomX;
-    return edgeBottomX + (edgeTopX - edgeBottomX) * (y / hTotal);
+    if (hTotal === 0) return edgeTopX;
+    return edgeTopX + (edgeBottomX - edgeTopX) * (y / hTotal);
   },
 
   divideEqualTrapezoid(a, b, c, d, n) {
