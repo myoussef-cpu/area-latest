@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تفاصيل العملية</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a6b3c">
+  <style>
+    .detail-container { max-width: 700px; margin: 0 auto; padding: 1rem; }
+    .detail-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .detail-card h3 { color: var(--primary-dark); margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); font-size: 1.1rem; }
+    .detail-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #f0f0f0; font-size: 0.95rem; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--text-secondary); }
+    .detail-value { font-weight: 600; color: var(--text-primary); }
+    .section-card { background: #fff8f0; border: 1px solid #ffe0b2; border-radius: 10px; padding: 1rem; margin-bottom: 0.8rem; }
+    .section-card h4 { color: #e65100; margin-bottom: 0.5rem; font-size: 1rem; }
+    .section-card .detail-row { font-size: 0.9rem; }
+    .actions-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .actions-bar .btn { flex: 1; min-width: 120px; text-align: center; padding: 0.6rem; font-size: 0.9rem; border-radius: 8px; cursor: pointer; border: none; font-family: inherit; }
+    .btn-download { background: var(--primary); color: #fff; }
+    .btn-print { background: #1565c0; color: #fff; }
+    .btn-back { background: var(--border); color: var(--text-primary); }
+    .btn-delete { background: #d32f2f; color: #fff; }
+    .empty-state { text-align: center; padding: 3rem; color: var(--text-secondary); }
+    .units-highlight { background: #e8f5e9; border-radius: 8px; padding: 0.8rem; margin-top: 0.5rem; }
+    .units-highlight .detail-value { color: var(--primary-dark); font-size: 1.05rem; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <h1>📐 تفاصيل العملية</h1>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="detail-container" id="detailContent">
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <p>العملية غير موجودة</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/storage.js"></script>
+  <script src="js/export.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = parseInt(params.get('id'));
+    const container = document.getElementById('detailContent');
+    const emptyState = document.getElementById('emptyState');
+
+    function render() {
+      if (!id) { emptyState.style.display = 'block'; return; }
+      const item = Storage.getById(id);
+      if (!item) { emptyState.style.display = 'block'; return; }
+
+      document.title = item.title || 'تفاصيل العملية';
+      const r = item.result || {};
+      const u = item.units || r.units || {};
+      const inputs = item.inputs || {};
+
+      let html = `
+        <div class="actions-bar">
+          <button class="btn btn-back" onclick="window.location.href='index.html'">العودة</button>
+          <button class="btn btn-download" onclick="downloadImage()">تحميل كصورة</button>
+          <button class="btn btn-print" onclick="printPage()">طباعة</button>
+          <button class="btn btn-delete" onclick="deleteItem(${item.id})">حذف</button>
+        </div>
+      `;
+
+      html += `<div class="detail-card"><h3>📋 ${item.title || 'عملية سابقة'}</h3>`;
+      html += `<div class="detail-row"><span class="detail-label">التاريخ</span><span class="detail-value">${item.date || '-'}</span></div>`;
+      html += `</div>`;
+
+      html += `<div class="detail-card"><h3>المدخلات</h3>`;
+      const inputLabels = {
+        a: 'القاعدة العلوية', b: 'القاعدة السفلية', c: 'الضلع الأيمن', d: 'الضلع الأيسر', diag: 'القطر'
+      };
+      for (const [key, val] of Object.entries(inputs)) {
+        if (val !== undefined && val !== null && val !== '') {
+          html += `<div class="detail-row"><span class="detail-label">${inputLabels[key] || key}</span><span class="detail-value">${val} م</span></div>`;
+        }
+      }
+      html += `</div>`;
+
+      html += `<div class="detail-card"><h3>النتائج</h3>`;
+      const resultLabels = {
+        areaM2: 'المساحة الكلية', h: 'الارتفاع', x1: 'x1', x2: 'x2',
+        diag1: 'القطر الأول', diag2: 'القطر الثاني', perimeter: 'المحيط',
+        h1: 'الارتفاع الأول', h2: 'الارتفاع الثاني', diag: 'القطر',
+        area1: 'مساحة المثلث 1', area2: 'مساحة المثلث 2',
+        a: 'القاعدة العلوية', b: 'القاعدة السفلية', c: 'الضلع الأيمن', d: 'الضلع الأيسر'
+      };
+      for (const [key, val] of Object.entries(r)) {
+        if (key === 'units' || key === 'errors' || val === undefined || val === null) continue;
+        if (typeof val === 'object') continue;
+        const unit = (key.includes('area') || key.includes('مساحة')) ? 'م²' : 'م';
+        const label = resultLabels[key] || key;
+        html += `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${val} ${unit}</span></div>`;
+      }
+      html += `</div>`;
+
+      if (u.display || u.feddan !== undefined) {
+        html += `<div class="detail-card units-highlight"><h3>الوحدات</h3>`;
+        if (u.feddan !== undefined) html += `<div class="detail-row"><span class="detail-label">الفدان</span><span class="detail-value">${u.feddan} فدان</span></div>`;
+        if (u.qirat !== undefined) html += `<div class="detail-row"><span class="detail-label">القيراط</span><span class="detail-value">${u.qirat} قيراط</span></div>`;
+        if (u.sah !== undefined) html += `<div class="detail-row"><span class="detail-label">السهم</span><span class="detail-value">${u.sah} سهم</span></div>`;
+        if (u.display) html += `<div class="detail-row"><span class="detail-label">العرض</span><span class="detail-value">${u.display}</span></div>`;
+        html += `</div>`;
+      }
+
+      if (item.pageUrl) {
+        html += `<div class="actions-bar"><a href="${item.pageUrl}?id=${item.id}" class="btn btn-back" style="text-decoration:none;text-align:center;">فتح في صفحة الحساب</a></div>`;
+      }
+
+      container.innerHTML = container.innerHTML.replace(emptyState.outerHTML, '') + html;
+    }
+
+    function deleteItem(id) {
+      if (!confirm('هل تريد حذف هذه العملية؟')) return;
+      const history = Storage.getAll();
+      const updated = history.filter(e => e.id !== id);
+      localStorage.setItem(Storage.KEY, JSON.stringify(updated));
+      window.location.href = 'index.html';
+    }
+
+    function downloadImage() {
+      const item = Storage.getById(id);
+      if (!item) return;
+
+      const data = buildDetailCanvas(item);
+      const link = document.createElement('a');
+      link.download = `${(item.title || 'عملية').replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.png`;
+      link.href = data.toDataURL('image/png');
+      link.click();
+    }
+
+    function printPage() {
+      const item = Storage.getById(id);
+      if (!item) return;
+
+      const data = buildDetailCanvas(item);
+      const dataUrl = data.toDataURL('image/png');
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>${item.title || 'عملية'}</title>
+        <style>
+          @page{margin:10mm}
+          body{margin:0;padding:0;display:flex;justify-content:center;align-items:flex-start;background:#fff}
+          img{max-width:100%;height:auto}
+        </style></head><body>
+        <img src="${dataUrl}" onload="window.print();window.close()">
+        </body></html>`);
+      win.document.close();
+    }
+
+    function buildDetailCanvas(item) {
+      const W = 800;
+      const PADDING = 30;
+      const LINE_HEIGHT = 28;
+      const r = item.result || {};
+      const u = item.units || r.units || {};
+      const inputs = item.inputs || {};
+
+      const inputLabels = {
+        a: 'القاعدة العلوية', b: 'القاعدة السفلية', c: 'الضلع الأيمن', d: 'الضلع الأيسر', diag: 'القطر'
+      };
+      const resultLabels = {
+        areaM2: 'المساحة الكلية', h: 'الارتفاع', x1: 'x1', x2: 'x2',
+        diag1: 'القطر الأول', diag2: 'القطر الثاني', perimeter: 'المحيط',
+        h1: 'الارتفاع الأول', h2: 'الارتفاع الثاني', diag: 'القطر',
+        area1: 'مساحة المثلث 1', area2: 'مساحة المثلث 2',
+        a: 'القاعدة العلوية', b: 'القاعدة السفلية', c: 'الضلع الأيمن', d: 'الضلع الأيسر'
+      };
+
+      let totalH = PADDING;
+      totalH += 50;
+      totalH += 10;
+
+      const inputEntries = Object.entries(inputs).filter(([, v]) => v !== undefined && v !== null && v !== '');
+      totalH += Math.ceil(inputEntries.length / 2) * LINE_HEIGHT + 15;
+
+      const resultEntries = Object.entries(r).filter(([k, v]) => k !== 'units' && k !== 'errors' && v !== undefined && v !== null && typeof v !== 'object');
+      totalH += Math.ceil(resultEntries.length / 2) * LINE_HEIGHT + 15;
+
+      const unitEntries = [];
+      if (u.feddan !== undefined) unitEntries.push(['الفدان', u.feddan + ' فدان']);
+      if (u.qirat !== undefined) unitEntries.push(['القيراط', u.qirat + ' قيراط']);
+      if (u.sah !== undefined) unitEntries.push(['السهم', u.sah + ' سهم']);
+      if (u.display) unitEntries.push(['العرض', u.display]);
+      if (unitEntries.length > 0) totalH += Math.ceil(unitEntries.length / 2) * LINE_HEIGHT + 30;
+
+      totalH += PADDING;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = W * dpr;
+      canvas.height = totalH * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = totalH + 'px';
+      ctx.scale(dpr, dpr);
+
+      ctx.fillStyle = '#f5f0e8';
+      ctx.fillRect(0, 0, W, totalH);
+
+      ctx.fillStyle = '#1a6b3c';
+      ctx.fillRect(0, 0, W, 50);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 18px Segoe UI, Tahoma, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.title || 'عملية سابقة', W / 2, 25);
+
+      let y = 65;
+
+      ctx.fillStyle = '#0e4a28';
+      ctx.font = 'bold 14px Segoe UI, Tahoma, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('المدخلات:', W - PADDING, y);
+      y += 8;
+
+      ctx.fillStyle = '#333';
+      ctx.font = '13px Segoe UI, Tahoma, sans-serif';
+      for (let i = 0; i < inputEntries.length; i += 2) {
+        let x = W - PADDING;
+        for (let j = i; j < Math.min(i + 2, inputEntries.length); j++) {
+          const [key, val] = inputEntries[j];
+          ctx.fillText(`${inputLabels[key] || key}: ${val} م`, x, y + LINE_HEIGHT / 2);
+          x -= (W - PADDING * 2) / 2;
+        }
+        y += LINE_HEIGHT;
+      }
+      y += 10;
+
+      ctx.fillStyle = '#0e4a28';
+      ctx.font = 'bold 14px Segoe UI, Tahoma, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('النتائج:', W - PADDING, y);
+      y += 8;
+
+      ctx.fillStyle = '#333';
+      ctx.font = '13px Segoe UI, Tahoma, sans-serif';
+      for (let i = 0; i < resultEntries.length; i += 2) {
+        let x = W - PADDING;
+        for (let j = i; j < Math.min(i + 2, resultEntries.length); j++) {
+          const [key, val] = resultEntries[j];
+          const unit = (key.includes('area') || key.includes('مساحة')) ? 'م²' : 'م';
+          const label = resultLabels[key] || key;
+          ctx.fillText(`${label}: ${val} ${unit}`, x, y + LINE_HEIGHT / 2);
+          x -= (W - PADDING * 2) / 2;
+        }
+        y += LINE_HEIGHT;
+      }
+      y += 10;
+
+      if (unitEntries.length > 0) {
+        ctx.fillStyle = '#0e4a28';
+        ctx.font = 'bold 14px Segoe UI, Tahoma, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('الوحدات:', W - PADDING, y);
+        y += 8;
+
+        ctx.fillStyle = '#1a6b3c';
+        ctx.font = 'bold 13px Segoe UI, Tahoma, sans-serif';
+        for (let i = 0; i < unitEntries.length; i += 2) {
+          let x = W - PADDING;
+          for (let j = i; j < Math.min(i + 2, unitEntries.length); j++) {
+            ctx.fillText(`${unitEntries[j][0]}: ${unitEntries[j][1]}`, x, y + LINE_HEIGHT / 2);
+            x -= (W - PADDING * 2) / 2;
+          }
+          y += LINE_HEIGHT;
+        }
+      }
+
+      ctx.fillStyle = '#999';
+      ctx.font = '10px Segoe UI, Tahoma, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.date || new Date().toLocaleString('ar-EG'), W / 2, totalH - 10);
+
+      return canvas;
+    }
+
+    render();
+  </script>
+</body>
+</html>

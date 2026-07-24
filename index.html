@@ -109,10 +109,7 @@
     }
 
     function viewHistory(id) {
-      const item = Storage.getById(id);
-      if (item && item.pageUrl) {
-        window.location.href = item.pageUrl + '?id=' + id;
-      }
+      window.location.href = 'history-detail.html?id=' + id;
     }
 
     loadHistory();
