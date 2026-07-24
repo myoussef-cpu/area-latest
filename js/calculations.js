@@ -408,10 +408,6 @@ const Calculations = {
     const { h } = result;
     const leftBottomX = 0;
     const leftTopX = result.leftTopX;
-    const rightTopXBase = leftTopX + a;
-    const rightBottomXBase = b;
-    const slopeLeft = (leftBottomX - leftTopX) / h;
-    const slopeRight = (rightBottomXBase - rightTopXBase) / h;
 
     const sections = [];
     let cumH = 0;
@@ -437,8 +433,6 @@ const Calculations = {
 
       const secA = wTop;
       const secB = wBottom;
-      const secC = Math.round(secH * c / h * 1000) / 1000;
-      const secD = Math.round(secH * d / h * 1000) / 1000;
 
       const secArea = ((secA + secB) / 2) * secH;
       const secDiag1 = Math.sqrt(secA * secA + Math.pow(leftBottomXPos - leftTopXPos, 2) + secH * secH);
@@ -450,8 +444,8 @@ const Calculations = {
         inputDi: di,
         a: Math.round(secA * 1000) / 1000,
         b: Math.round(secB * 1000) / 1000,
-        c: secC,
-        d: secD,
+        c: ci,
+        d: di,
         h: Math.round(secH * 1000) / 1000,
         areaM2: Math.round(secArea * 1000) / 1000,
         diag1: Math.round(secDiag1 * 1000) / 1000,
@@ -599,8 +593,6 @@ const Calculations = {
       const wBottom = this.widthAtHeight(h, a, c, yBottom);
       const secArea = ((wTop + wBottom) / 2) * secH;
       const secDiag = diag1 * secH / h;
-      const secB = Math.round(secH * b / h * 1000) / 1000;
-      const secD = Math.round(secH * d / h * 1000) / 1000;
 
       sections.push({
         index: i + 1,
@@ -608,8 +600,8 @@ const Calculations = {
         inputDi: di,
         a: Math.round(wTop * 1000) / 1000,
         b: Math.round(wBottom * 1000) / 1000,
-        c: secB,
-        d: secD,
+        c: ci,
+        d: di,
         h: Math.round(secH * 1000) / 1000,
         areaM2: Math.round(secArea * 1000) / 1000,
         diag1: Math.round(secDiag * 1000) / 1000,
@@ -779,8 +771,6 @@ const Calculations = {
       const secH1 = h1 * secH / totalH;
       const secH2 = h2 * secH / totalH;
       const secDiag = diagN * secH / totalH;
-      const secB = Math.round(secH * b / totalH * 1000) / 1000;
-      const secD = Math.round(secH * d / totalH * 1000) / 1000;
 
       sections.push({
         index: i + 1,
@@ -788,8 +778,8 @@ const Calculations = {
         inputDi: di,
         a: Math.round(wTop * 1000) / 1000,
         b: Math.round(wBottom * 1000) / 1000,
-        c: secB,
-        d: secD,
+        c: ci,
+        d: di,
         h: Math.round(secH * 1000) / 1000,
         areaM2: Math.round(secArea * 1000) / 1000,
         diag1: Math.round(secDiag * 1000) / 1000,
