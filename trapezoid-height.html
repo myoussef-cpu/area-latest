@@ -51,14 +51,21 @@
 
     <section class="division-section" id="divisionSection" style="display:none;">
       <h2>خيارات التقسيم بالأضلاع المائلة</h2>
-      <p style="color:var(--text-light);margin-bottom:1rem;">أدخل الضلع الأيمن (ci) والضلع الأيسر (di) لكل قسم. الأقسام تُحسب من الأعلى إلى الأسفل.</p>
+      <p style="color:var(--text-light);margin-bottom:1rem;">أدخل القيم مفصولة بفاصلة.عدد القيم = عدد الأقسام. الأقسام من الأعلى إلى الأسفل.</p>
 
       <div id="slantInputsContainer">
-        <div class="form-group" style="max-width:300px;margin-bottom:1rem;">
-          <label>عدد الأقسام</label>
-          <input type="number" id="numSections" value="2" min="2" max="50" onchange="updateSlantInputs()">
+        <div class="form-grid" style="max-width:600px;">
+          <div class="form-group">
+            <label>الضلع الأيمن (ci) - مفصولة بفاصلة</label>
+            <input type="text" id="ciInput" placeholder="مثال: 5, 4, 3" oninput="onSlantInputChange()">
+          </div>
+          <div class="form-group">
+            <label>الضلع الأيسر (di) - مفصولة بفاصلة</label>
+            <input type="text" id="diInput" placeholder="مثال: 5, 4, 3" oninput="onSlantInputChange()">
+          </div>
         </div>
-        <div id="slantInputsList"></div>
+        <div id="slantPreview" style="margin:1rem 0;color:var(--text-secondary);font-size:0.95rem;"></div>
+        <div id="remainingArea" style="margin:0.5rem 0;padding:0.8rem;background:#fff3e0;border-radius:8px;display:none;"></div>
       </div>
 
       <button class="btn btn-primary" style="margin-top:1rem;" onclick="calculateDivisions()">حساب الأقسام</button>
@@ -113,7 +120,7 @@
       showResults(result);
       drawMainDiagram(result);
       document.getElementById('divisionSection').style.display = 'block';
-      updateSlantInputs();
+      onSlantInputChange();
     }
 
     function showResults(r) {
@@ -137,43 +144,54 @@
       document.getElementById('mainCanvasContainer').style.display = 'block';
     }
 
-    function updateSlantInputs() {
+    function onSlantInputChange() {
       if (!lastResult) return;
-      const n = parseInt(document.getElementById('numSections').value) || 2;
-      const list = document.getElementById('slantInputsList');
-      const avgC = Math.round((lastResult.c / n) * 1000) / 1000;
-      const avgD = Math.round((lastResult.d / n) * 1000) / 1000;
+      const ciVals = parseSlantInput('ciInput');
+      const diVals = parseSlantInput('diInput');
+      const n = Math.max(ciVals.length, diVals.length);
+      const preview = document.getElementById('slantPreview');
+      const remaining = document.getElementById('remainingArea');
 
-      let html = '';
-      for (let i = 0; i < n; i++) {
-        html += `
-          <div class="height-input-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-            <label style="min-width:80px;">القسم ${i + 1}:</label>
-            <div style="flex:1;">
-              <label style="font-size:0.8rem;color:#666;">الضلع الأيمن (ci)</label>
-              <input type="number" class="slant-ci-input" data-index="${i}" value="${avgC}" step="any" min="0" style="width:100%;">
-            </div>
-            <div style="flex:1;">
-              <label style="font-size:0.8rem;color:#666;">الضلع الأيسر (di)</label>
-              <input type="number" class="slant-di-input" data-index="${i}" value="${avgD}" step="any" min="0" style="width:100%;">
-            </div>
-          </div>
-        `;
-      }
-      list.innerHTML = html;
+      if (n === 0) { preview.innerHTML = ''; remaining.style.display = 'none'; return; }
+
+      const ciSum = ciVals.reduce((s, v) => s + v, 0);
+      const diSum = diVals.reduce((s, v) => s + v, 0);
+      const remainingC = lastResult.c - ciSum;
+      const remainingD = lastResult.d - diSum;
+
+      preview.innerHTML = `<strong>${n} قسم</strong> - ci: [${ciVals.join(', ')}] - di: [${diVals.join(', ')}]`;
+      remaining.style.display = 'block';
+      remaining.innerHTML = `
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+          <span>المتبقي من الضلع الأيمن (c): <strong style="color:${Math.abs(remainingC) < 0.001 ? 'var(--primary)' : remainingC < 0 ? '#d32f2f' : 'var(--text-primary)'}">${Math.round(remainingC * 1000) / 1000} م</strong></span>
+          <span>المتبقي من الضلع الأيسر (d): <strong style="color:${Math.abs(remainingD) < 0.001 ? 'var(--primary)' : remainingD < 0 ? '#d32f2f' : 'var(--text-primary)'}">${Math.round(remainingD * 1000) / 1000} م</strong></span>
+        </div>
+        <div style="margin-top:0.3rem;font-size:0.85rem;color:#999;">
+          ${(ciVals.length !== diVals.length) ? '⚠️ عدد قيم ci وdi غير متساوٍ - سيتم استخدام القيم المتاحة' : (Math.abs(remainingC) < 0.001 && Math.abs(remainingD) < 0.001) ? '✓ تم استخدام كامل الأضلاع' : ''}
+        </div>
+      `;
+    }
+
+    function parseSlantInput(inputId) {
+      const val = document.getElementById(inputId).value.trim();
+      if (!val) return [];
+      return val.split(/[,،\s]+/).map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0);
     }
 
     function calculateDivisions() {
       if (!lastResult) return;
-      const ciInputs = document.querySelectorAll('.slant-ci-input');
-      const diInputs = document.querySelectorAll('.slant-di-input');
+      const ciVals = parseSlantInput('ciInput');
+      const diVals = parseSlantInput('diInput');
+      const n = Math.max(ciVals.length, diVals.length);
+
+      if (n === 0) { showToast('أدخل قيم على الأقل في ci أو di'); return; }
 
       const slants = [];
-      for (let i = 0; i < ciInputs.length; i++) {
-        const ci = parseFloat(ciInputs[i].value) || 0;
-        const di = parseFloat(diInputs[i].value) || 0;
-        if (ci <= 0 || di <= 0) { showToast('أدخل جميع الأضلاع المائلة لكل قسم'); return; }
-        slants.push({ ci, di });
+      for (let i = 0; i < n; i++) {
+        slants.push({
+          ci: ciVals[i] || 0,
+          di: diVals[i] || 0
+        });
       }
 
       if (slants.length === 0) { showToast('أدخل قسم على الأقل'); return; }
