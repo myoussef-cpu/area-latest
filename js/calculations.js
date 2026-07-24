@@ -255,15 +255,25 @@ const Calculations = {
     const result = this.trapezoidCalc(a, b, c, d);
     if (result.errors) return result;
 
-    const { h, x1, x2, areaM2, diag1, diag2, leftTopX } = result;
+    const { h, areaM2, diag1, diag2, leftTopX } = result;
     const leftBottomX = 0;
+    const secArea = areaM2 / n;
+    const k = (b - a) / (2 * h);
 
     const sections = [];
-    const sectionH = h / n;
+    let cumY = 0;
 
     for (let i = 0; i < n; i++) {
-      const yTop = i * sectionH;
-      const yBottom = (i + 1) * sectionH;
+      const targetArea = (i + 1) * secArea;
+      let yBottom;
+      if (Math.abs(k) < 1e-9) {
+        yBottom = targetArea / a;
+      } else {
+        yBottom = (-a + Math.sqrt(a * a + 4 * k * targetArea)) / (2 * k);
+      }
+      yBottom = Math.min(yBottom, h);
+      const yTop = cumY;
+      const secH = yBottom - yTop;
 
       const wTop = this.widthAtHeight(h, a, b, yTop);
       const wBottom = this.widthAtHeight(h, a, b, yBottom);
@@ -275,17 +285,17 @@ const Calculations = {
 
       const secA = wTop;
       const secB = wBottom;
-      const secC = Math.sqrt(sectionH * sectionH + Math.pow(rightBottomXPos - rightTopXPos, 2));
-      const secD = Math.sqrt(sectionH * sectionH + Math.pow(leftBottomXPos - leftTopXPos, 2));
+      const secC = Math.sqrt(secH * secH + Math.pow(rightBottomXPos - rightTopXPos, 2));
+      const secD = Math.sqrt(secH * secH + Math.pow(leftBottomXPos - leftTopXPos, 2));
 
-      const secArea = ((secA + secB) / 2) * sectionH;
+      const secAreaCalc = ((secA + secB) / 2) * secH;
       const secX1 = rightBottomXPos - rightTopXPos;
       const secX2 = leftBottomXPos - leftTopXPos;
       const secHsq = secC * secC - secX1 * secX1;
-      const secH = secHsq > 0 ? Math.sqrt(secHsq) : sectionH;
+      const secHval = secHsq > 0 ? Math.sqrt(secHsq) : secH;
 
-      const secDiag1 = Math.sqrt(secA * secA + secX2 * secX2 + secH * secH);
-      const secDiag2 = Math.sqrt(secB * secB + secX1 * secX1 + secH * secH);
+      const secDiag1 = Math.sqrt(secA * secA + secX2 * secX2 + secHval * secHval);
+      const secDiag2 = Math.sqrt(secB * secB + secX1 * secX1 + secHval * secHval);
 
       sections.push({
         index: i + 1,
@@ -293,17 +303,19 @@ const Calculations = {
         b: Math.round(secB * 1000) / 1000,
         c: Math.round(secC * 1000) / 1000,
         d: Math.round(secD * 1000) / 1000,
-        h: Math.round(secH * 1000) / 1000,
-        areaM2: Math.round(secArea * 1000) / 1000,
+        h: Math.round(secHval * 1000) / 1000,
+        areaM2: Math.round(secAreaCalc * 1000) / 1000,
         diag1: Math.round(secDiag1 * 1000) / 1000,
         diag2: Math.round(secDiag2 * 1000) / 1000,
-        units: this.toUnits(secArea),
+        units: this.toUnits(secAreaCalc),
         leftTopX: leftTopXPos,
         leftBottomX: leftBottomXPos,
         rightTopX: rightTopXPos,
         rightBottomX: rightBottomXPos,
         yTop, yBottom
       });
+
+      cumY = yBottom;
     }
 
     return { original: result, sections };
@@ -460,36 +472,43 @@ const Calculations = {
 
     const { areaM2, h, diag1 } = result;
     const secArea = areaM2 / n;
-    const secH = h / n;
+    const k = (c - a) / (2 * h);
 
     const sections = [];
-    const leftTopW = a;
-    const leftBotW = (a + c) / 2;
-    const rightTopW = (a + c) / 2;
-    const rightBotW = c;
+    let cumY = 0;
 
     for (let i = 0; i < n; i++) {
-      const yTop = (i * h) / n;
-      const yBottom = ((i + 1) * h) / n;
+      const targetArea = (i + 1) * secArea;
+      let yBottom;
+      if (Math.abs(k) < 1e-9) {
+        yBottom = targetArea / a;
+      } else {
+        yBottom = (-a + Math.sqrt(a * a + 4 * k * targetArea)) / (2 * k);
+      }
+      yBottom = Math.min(yBottom, h);
+      const yTop = cumY;
+      const secH = yBottom - yTop;
 
       const wTop = this.widthAtHeight(h, a, c, yTop);
       const wBottom = this.widthAtHeight(h, a, c, yBottom);
-
-      const secDiag1 = diag1 / n;
+      const secAreaCalc = ((wTop + wBottom) / 2) * secH;
+      const secDiag = diag1 * secH / h;
 
       sections.push({
         index: i + 1,
         a: Math.round(wTop * 1000) / 1000,
         b: Math.round(wBottom * 1000) / 1000,
-        c: Math.round(secDiag1 * 1000) / 1000,
-        d: Math.round(secDiag1 * 1000) / 1000,
+        c: Math.round(secDiag * 1000) / 1000,
+        d: Math.round(secDiag * 1000) / 1000,
         h: Math.round(secH * 1000) / 1000,
-        areaM2: Math.round(secArea * 1000) / 1000,
-        diag1: Math.round(secDiag1 * 1000) / 1000,
-        diag2: Math.round(secDiag1 * 1000) / 1000,
-        units: this.toUnits(secArea),
+        areaM2: Math.round(secAreaCalc * 1000) / 1000,
+        diag1: Math.round(secDiag * 1000) / 1000,
+        diag2: Math.round(secDiag * 1000) / 1000,
+        units: this.toUnits(secAreaCalc),
         yTop, yBottom
       });
+
+      cumY = yBottom;
     }
 
     return { original: result, sections };
@@ -606,43 +625,50 @@ const Calculations = {
     const { areaM2, h1, h2, diag: diagN } = result;
     const totalH = h1 + h2;
     const secArea = areaM2 / n;
+    const A_coeff = diagN / (2 * totalH);
 
     const sections = [];
-    const secH = totalH / n;
+    let cumY = 0;
 
     for (let i = 0; i < n; i++) {
-      const yTop = i * secH;
-      const yBottom = (i + 1) * secH;
+      const targetArea = (i + 1) * secArea;
+      let yBottom;
+      if (Math.abs(A_coeff) < 1e-9) {
+        yBottom = targetArea / diagN;
+      } else {
+        const disc = diagN * diagN - 4 * A_coeff * targetArea;
+        yBottom = (diagN - Math.sqrt(Math.max(0, disc))) / (2 * A_coeff);
+      }
+      yBottom = Math.min(yBottom, totalH);
+      const yTop = cumY;
+      const secH = yBottom - yTop;
+
       const fracTop = yTop / totalH;
       const fracBottom = yBottom / totalH;
-
-      const wTop = diagN * (1 - fracTop * (diagN - diagN) / diagN);
-      const wBottom = diagN * (1 - fracBottom * (diagN - diagN) / diagN);
-
-      const leftTop = a * (1 - fracTop) + d * fracTop;
-      const leftBot = a * (1 - fracBottom) + d * fracBottom;
-      const rightTop = b * (1 - fracTop) + c * fracTop;
-      const rightBot = b * (1 - fracBottom) + c * fracBottom;
-
-      const secDiag1 = diagN * secH / totalH;
+      const wTop = diagN * (1 - fracTop);
+      const wBottom = diagN * (1 - fracBottom);
+      const secAreaCalc = ((wTop + wBottom) / 2) * secH;
+      const secDiag = diagN * secH / totalH;
       const secH1 = h1 * secH / totalH;
       const secH2 = h2 * secH / totalH;
 
       sections.push({
         index: i + 1,
-        a: Math.round(diagN * 1000) / 1000,
-        b: Math.round(diagN * 1000) / 1000,
-        c: Math.round(secDiag1 * 1000) / 1000,
-        d: Math.round(secDiag1 * 1000) / 1000,
+        a: Math.round(wTop * 1000) / 1000,
+        b: Math.round(wBottom * 1000) / 1000,
+        c: Math.round(secDiag * 1000) / 1000,
+        d: Math.round(secDiag * 1000) / 1000,
         h: Math.round(secH * 1000) / 1000,
-        areaM2: Math.round(secArea * 1000) / 1000,
-        diag1: Math.round(secDiag1 * 1000) / 1000,
-        diag2: Math.round(secDiag1 * 1000) / 1000,
+        areaM2: Math.round(secAreaCalc * 1000) / 1000,
+        diag1: Math.round(secDiag * 1000) / 1000,
+        diag2: Math.round(secDiag * 1000) / 1000,
         h1: Math.round(secH1 * 1000) / 1000,
         h2: Math.round(secH2 * 1000) / 1000,
-        units: this.toUnits(secArea),
+        units: this.toUnits(secAreaCalc),
         yTop, yBottom
       });
+
+      cumY = yBottom;
     }
 
     return { original: result, sections };
