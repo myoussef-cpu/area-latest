@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تقسيم شبه المنحرف بالأضلاع المائلة</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a6b3c">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <a href="index.html" class="back-btn">→ الرئيسية</a>
+      <h1>تقسيم شبه المنحرف بالأضلاع المائلة</h1>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="form-section">
+      <h2>أدخل أبعاد شبه المنحرف</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>القاعدة العلوية (م)</label>
+          <input type="number" id="inputA" placeholder="مثال: 10" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>القاعدة السفلية (م)</label>
+          <input type="number" id="inputB" placeholder="مثال: 16" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>الضلع المائل الأيمن (م)</label>
+          <input type="number" id="inputC" placeholder="مثال: 5" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>الضلع المائل الأيسر (م)</label>
+          <input type="number" id="inputD" placeholder="مثال: 5" step="any" min="0">
+        </div>
+      </div>
+    </section>
+
+    <section class="results-box" id="resultsBox" style="display:none;">
+      <h3>النتائج</h3>
+      <div class="results-grid" id="resultsGrid"></div>
+    </section>
+
+    <section class="canvas-container" id="mainCanvasContainer" style="display:none;">
+      <canvas id="mainCanvas"></canvas>
+      <div class="zoom-hint">اضغط على الرسم للتكبير</div>
+    </section>
+
+    <section class="division-section" id="divisionSection" style="display:none;">
+      <h2>خيارات التقسيم بالأضلاع المائلة</h2>
+      <p style="color:var(--text-light);margin-bottom:1rem;">أدخل الضلع الأيمن (ci) والضلع الأيسر (di) لكل قسم. الأقسام تُحسب من الأعلى إلى الأسفل.</p>
+
+      <div id="slantInputsContainer">
+        <div class="form-group" style="max-width:300px;margin-bottom:1rem;">
+          <label>عدد الأقسام</label>
+          <input type="number" id="numSections" value="2" min="2" max="50" onchange="updateSlantInputs()">
+        </div>
+        <div id="slantInputsList"></div>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:1rem;" onclick="calculateDivisions()">حساب الأقسام</button>
+
+      <div id="divisionResults" class="division-results"></div>
+
+      <div class="action-buttons" id="actionBtns" style="display:none;">
+        <button class="btn btn-primary" onclick="saveData()">💾 حفظ البيانات</button>
+        <button class="btn btn-secondary" onclick="showAllAsImage()">🖼️ عرض الكل كصورة</button>
+        <button class="btn btn-outline" onclick="printResults()">🖨️ طباعة</button>
+        <button class="btn btn-danger" onclick="clearAll()">🗑️ مسح الكل</button>
+      </div>
+    </section>
+
+    <section class="canvas-container" id="allSectionsCanvasContainer" style="display:none;">
+      <canvas id="allSectionsCanvas"></canvas>
+      <div class="zoom-hint">عرض جميع الأقسام معاً</div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/calculations.js"></script>
+  <script src="js/diagrams.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/export.js"></script>
+  <script>
+    let lastResult = null;
+    let lastDivisions = null;
+
+    ['inputA','inputB','inputC','inputD'].forEach(id => {
+      document.getElementById(id).addEventListener('input', autoCalculate);
+    });
+
+    function autoCalculate() {
+      const a = document.getElementById('inputA').value;
+      const b = document.getElementById('inputB').value;
+      const c = document.getElementById('inputC').value;
+      const d = document.getElementById('inputD').value;
+
+      if (!a || !b || !c || !d) {
+        document.getElementById('resultsBox').style.display = 'none';
+        document.getElementById('mainCanvasContainer').style.display = 'none';
+        document.getElementById('divisionSection').style.display = 'none';
+        return;
+      }
+
+      const result = Calculations.trapezoidCalc(a, b, c, d);
+      if (result.errors) { document.getElementById('resultsBox').style.display = 'none'; return; }
+
+      lastResult = result;
+      showResults(result);
+      drawMainDiagram(result);
+      document.getElementById('divisionSection').style.display = 'block';
+      updateSlantInputs();
+    }
+
+    function showResults(r) {
+      document.getElementById('resultsGrid').innerHTML = `
+        <div class="result-item"><div class="label">المساحة الكلية</div><div class="value">${r.areaM2} <span class="unit">م²</span></div></div>
+        <div class="result-item"><div class="label">الفدان</div><div class="value">${r.units.feddan} <span class="unit">فدان</span></div></div>
+        <div class="result-item"><div class="label">القيراط</div><div class="value">${r.units.qirat} <span class="unit">قيراط</span></div></div>
+        <div class="result-item"><div class="label">السهم</div><div class="value">${r.units.sah} <span class="unit">سهم</span></div></div>
+        <div class="result-item"><div class="label">الارتفاع</div><div class="value">${r.h} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">x1</div><div class="value">${r.x1} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">x2</div><div class="value">${r.x2} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">القطر الأول</div><div class="value">${r.diag1} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">القطر الثاني</div><div class="value">${r.diag2} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">المحيط</div><div class="value">${r.perimeter} <span class="unit">م</span></div></div>
+      `;
+      document.getElementById('resultsBox').style.display = 'block';
+    }
+
+    function drawMainDiagram(r) {
+      Diagrams.drawTrapezoid(document.getElementById('mainCanvas'), r, null);
+      document.getElementById('mainCanvasContainer').style.display = 'block';
+    }
+
+    function updateSlantInputs() {
+      if (!lastResult) return;
+      const n = parseInt(document.getElementById('numSections').value) || 2;
+      const list = document.getElementById('slantInputsList');
+      const avgC = Math.round((lastResult.c / n) * 1000) / 1000;
+      const avgD = Math.round((lastResult.d / n) * 1000) / 1000;
+
+      let html = '';
+      for (let i = 0; i < n; i++) {
+        html += `
+          <div class="height-input-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <label style="min-width:80px;">القسم ${i + 1}:</label>
+            <div style="flex:1;">
+              <label style="font-size:0.8rem;color:#666;">الضلع الأيمن (ci)</label>
+              <input type="number" class="slant-ci-input" data-index="${i}" value="${avgC}" step="any" min="0" style="width:100%;">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:0.8rem;color:#666;">الضلع الأيسر (di)</label>
+              <input type="number" class="slant-di-input" data-index="${i}" value="${avgD}" step="any" min="0" style="width:100%;">
+            </div>
+          </div>
+        `;
+      }
+      list.innerHTML = html;
+    }
+
+    function calculateDivisions() {
+      if (!lastResult) return;
+      const ciInputs = document.querySelectorAll('.slant-ci-input');
+      const diInputs = document.querySelectorAll('.slant-di-input');
+
+      const slants = [];
+      for (let i = 0; i < ciInputs.length; i++) {
+        const ci = parseFloat(ciInputs[i].value) || 0;
+        const di = parseFloat(diInputs[i].value) || 0;
+        if (ci <= 0 || di <= 0) { showToast('أدخل جميع الأضلاع المائلة لكل قسم'); return; }
+        slants.push({ ci, di });
+      }
+
+      if (slants.length === 0) { showToast('أدخل قسم على الأقل'); return; }
+
+      const result = Calculations.divideBySlantTrapezoid(lastResult.a, lastResult.b, lastResult.c, lastResult.d, slants);
+      if (result.errors) { showToast(result.errors[0]); return; }
+
+      lastDivisions = result;
+      showDivisionResults(result);
+      drawAllSections(result);
+      document.getElementById('actionBtns').style.display = 'flex';
+    }
+
+    function showDivisionResults(result) {
+      const container = document.getElementById('divisionResults');
+      let html = `<h3 style="color:var(--primary-dark);margin:1.5rem 0 1rem;">الأقسام (${result.sections.length} قسم)</h3>`;
+
+      result.sections.forEach(sec => {
+        html += `
+          <div class="division-card">
+            <h4>القسم ${sec.index}</h4>
+            <canvas id="secCanvas${sec.index}" class="section-canvas"></canvas>
+            <div class="zoom-hint">اضغط للتكبير</div>
+            <div class="results-grid" style="margin-top:1rem;">
+              <div class="result-item"><div class="label">المساحة</div><div class="value">${sec.areaM2} <span class="unit">م²</span></div></div>
+              <div class="result-item"><div class="label">بالوحدات</div><div class="value">${sec.units.display}</div></div>
+              <div class="result-item"><div class="label">القاعدة العلوية</div><div class="value">${sec.a} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">القاعدة السفلية</div><div class="value">${sec.b} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الضلع الأيمن</div><div class="value">${sec.c} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الضلع الأيسر</div><div class="value">${sec.d} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الارتفاع</div><div class="value">${sec.h} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">القطر الأول</div><div class="value">${sec.diag1} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">القطر الثاني</div><div class="value">${sec.diag2} <span class="unit">م</span></div></div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      result.sections.forEach(sec => {
+        Diagrams.drawTrapezoidSection(document.getElementById(`secCanvas${sec.index}`), sec, sec.index, lastResult.h, lastResult.a, lastResult.b);
+      });
+    }
+
+    function drawAllSections(result) {
+      Diagrams.drawTrapezoid(document.getElementById('allSectionsCanvas'), lastResult, result.sections, lastResult.h);
+      document.getElementById('allSectionsCanvasContainer').style.display = 'block';
+    }
+
+    function saveData() {
+      if (!lastResult) return;
+      Export.saveFullData({
+        title: 'تقسيم شبه المنحرف بالأضلاع المائلة',
+        inputs: {
+          'القاعدة العلوية': document.getElementById('inputA').value,
+          'القاعدة السفلية': document.getElementById('inputB').value,
+          'الضلع الأيمن': document.getElementById('inputC').value,
+          'الضلع الأيسر': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null
+      });
+      Storage.save({ title: 'تقسيم شبه المنحرف بالأضلاع المائلة', pageUrl: 'trapezoid-height.html', inputs: { a: lastResult.a, b: lastResult.b, c: lastResult.c, d: lastResult.d }, result: lastResult, units: lastResult.units });
+      showToast('تم حفظ البيانات بنجاح');
+    }
+
+    function showAllAsImage() {
+      if (!lastResult) return;
+      Export.exportFullPage({
+        title: 'تقسيم شبه المنحرف بالأضلاع المائلة',
+        inputs: {
+          'القاعدة العلوية': document.getElementById('inputA').value,
+          'القاعدة السفلية': document.getElementById('inputB').value,
+          'الضلع الأيمن': document.getElementById('inputC').value,
+          'الضلع الأيسر': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null,
+        mainCanvasId: 'mainCanvas',
+        sectionCanvasPrefix: 'secCanvas'
+      });
+      showToast('تم حفظ الصورة');
+    }
+
+    function printResults() {
+      if (!lastResult) return;
+      Export.printFullPage({
+        title: 'تقسيم شبه المنحرف بالأضلاع المائلة',
+        inputs: {
+          'القاعدة العلوية': document.getElementById('inputA').value,
+          'القاعدة السفلية': document.getElementById('inputB').value,
+          'الضلع الأيمن': document.getElementById('inputC').value,
+          'الضلع الأيسر': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null,
+        mainCanvasId: 'mainCanvas',
+        sectionCanvasPrefix: 'secCanvas'
+      });
+    }
+    function clearAll() {
+      ['inputA','inputB','inputC','inputD'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('resultsBox').style.display = 'none';
+      document.getElementById('mainCanvasContainer').style.display = 'none';
+      document.getElementById('divisionSection').style.display = 'none';
+      document.getElementById('allSectionsCanvasContainer').style.display = 'none';
+      document.getElementById('actionBtns').style.display = 'none';
+      document.getElementById('divisionResults').innerHTML = '';
+      lastResult = null; lastDivisions = null;
+    }
+    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+    document.querySelectorAll('canvas').forEach(c => c.addEventListener('click', () => c.classList.toggle('zoomed')));
+  </script>
+</body>
+</html>

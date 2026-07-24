@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تقسيم الرباعي الدائري بالأضلاع المائلة</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1565c0">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <a href="index.html" class="back-btn">→ الرئيسية</a>
+      <h1>تقسيم الرباعي الدائري بالأضلاع المائلة</h1>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="form-section">
+      <h2>أدخل أضلاع الرباعي الدائري</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>الضلع الأول (م)</label>
+          <input type="number" id="inputA" placeholder="مثال: 10" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>الضلع الثاني (م)</label>
+          <input type="number" id="inputB" placeholder="مثال: 12" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>الضلع الثالث (م)</label>
+          <input type="number" id="inputC" placeholder="مثال: 10" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>الضلع الرابع (م)</label>
+          <input type="number" id="inputD" placeholder="مثال: 8" step="any" min="0">
+        </div>
+      </div>
+    </section>
+
+    <section class="results-box" id="resultsBox" style="display:none;">
+      <h3>النتائج</h3>
+      <div class="results-grid" id="resultsGrid"></div>
+    </section>
+
+    <section class="canvas-container" id="mainCanvasContainer" style="display:none;">
+      <canvas id="mainCanvas"></canvas>
+      <div class="zoom-hint">اضغط على الرسم للتكبير</div>
+    </section>
+
+    <section class="division-section" id="divisionSection" style="display:none;">
+      <h2>خيارات التقسيم</h2>
+
+      <div style="margin-bottom:1rem;">
+        <label style="font-weight:bold;display:block;margin-bottom:0.5rem;">اتجاه التقسيم:</label>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="radio" name="cutDirection" value="bd" checked onchange="onDirectionChange()">
+            التقسيم عمودياً (يقطع الضلعين 2 و 4)
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="radio" name="cutDirection" value="ac" onchange="onDirectionChange()">
+            التقسيم أفقياً (يقطع الضلعين 1 و 3)
+          </label>
+        </div>
+      </div>
+
+      <p id="divisionHint" style="color:var(--text-light);margin-bottom:1rem;">أدخل الضلع الثالث (ci) والضلع الرابع (di) لكل قسم. الأقسام تُحسب من الأعلى إلى الأسفل.</p>
+
+      <div id="slantInputsContainer">
+        <div class="form-group" style="max-width:300px;margin-bottom:1rem;">
+          <label>عدد الأقسام</label>
+          <input type="number" id="numSections" value="2" min="2" max="50" onchange="updateSlantInputs()">
+        </div>
+        <div id="slantInputsList"></div>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:1rem;" onclick="calculateDivisions()">حساب الأقسام</button>
+
+      <div id="divisionResults" class="division-results"></div>
+
+      <div class="action-buttons" id="actionBtns" style="display:none;">
+        <button class="btn btn-primary" onclick="saveData()">💾 حفظ البيانات</button>
+        <button class="btn btn-secondary" onclick="showAllAsImage()">🖼️ عرض الكل كصورة</button>
+        <button class="btn btn-outline" onclick="printResults()">🖨️ طباعة</button>
+        <button class="btn btn-danger" onclick="clearAll()">🗑️ مسح الكل</button>
+      </div>
+    </section>
+
+    <section class="canvas-container" id="allSectionsCanvasContainer" style="display:none;">
+      <canvas id="allSectionsCanvas"></canvas>
+      <div class="zoom-hint">عرض جميع الأقسام معاً</div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/calculations.js"></script>
+  <script src="js/diagrams.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/export.js"></script>
+  <script>
+    let lastResult = null;
+    let lastDivisions = null;
+
+    ['inputA','inputB','inputC','inputD'].forEach(id => {
+      document.getElementById(id).addEventListener('input', autoCalculate);
+    });
+
+    function getDirection() {
+      const checked = document.querySelector('input[name="cutDirection"]:checked');
+      return checked ? checked.value : 'bd';
+    }
+
+    function onDirectionChange() {
+      const dir = getDirection();
+      const hint = document.getElementById('divisionHint');
+      if (dir === 'ac') {
+        hint.textContent = 'أدخل العرض العلوي (ai) والعرض السفلي (ci) لكل قسم. يُحسب من الأعلى إلى الأسفل.';
+      } else {
+        hint.textContent = 'أدخل الضلع الثالث (ci) والضلع الرابع (di) لكل قسم. الأقسام تُحسب من الأعلى إلى الأسفل.';
+      }
+      updateSlantInputs();
+      if (lastDivisions) {
+        lastDivisions = null;
+        document.getElementById('divisionResults').innerHTML = '';
+        document.getElementById('allSectionsCanvasContainer').style.display = 'none';
+        document.getElementById('actionBtns').style.display = 'none';
+      }
+    }
+
+    function autoCalculate() {
+      const a = document.getElementById('inputA').value;
+      const b = document.getElementById('inputB').value;
+      const c = document.getElementById('inputC').value;
+      const d = document.getElementById('inputD').value;
+
+      if (!a || !b || !c || !d) {
+        document.getElementById('resultsBox').style.display = 'none';
+        document.getElementById('mainCanvasContainer').style.display = 'none';
+        document.getElementById('divisionSection').style.display = 'none';
+        return;
+      }
+
+      const result = Calculations.cyclicQuadCalc(a, b, c, d);
+      if (result.errors) { document.getElementById('resultsBox').style.display = 'none'; return; }
+
+      lastResult = result;
+      showResults(result);
+      drawMainDiagram(result);
+      document.getElementById('divisionSection').style.display = 'block';
+      updateSlantInputs();
+    }
+
+    function showResults(r) {
+      document.getElementById('resultsGrid').innerHTML = `
+        <div class="result-item"><div class="label">المساحة الكلية</div><div class="value">${r.areaM2} <span class="unit">م²</span></div></div>
+        <div class="result-item"><div class="label">الفدان</div><div class="value">${r.units.feddan} <span class="unit">فدان</span></div></div>
+        <div class="result-item"><div class="label">القيراط</div><div class="value">${r.units.qirat} <span class="unit">قيراط</span></div></div>
+        <div class="result-item"><div class="label">السهم</div><div class="value">${r.units.sah} <span class="unit">سهم</span></div></div>
+        <div class="result-item"><div class="label">الارتفاع المكافئ</div><div class="value">${r.h} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">القطر الأول</div><div class="value">${r.diag1} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">القطر الثاني</div><div class="value">${r.diag2} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">المحيط</div><div class="value">${r.perimeter} <span class="unit">م</span></div></div>
+      `;
+      document.getElementById('resultsBox').style.display = 'block';
+    }
+
+    function drawMainDiagram(r) {
+      Diagrams.drawCyclicQuad(document.getElementById('mainCanvas'), r, null);
+      document.getElementById('mainCanvasContainer').style.display = 'block';
+    }
+
+    function updateSlantInputs() {
+      if (!lastResult) return;
+      const n = parseInt(document.getElementById('numSections').value) || 2;
+      const list = document.getElementById('slantInputsList');
+      const dir = getDirection();
+
+      let html = '';
+      for (let i = 0; i < n; i++) {
+        if (dir === 'ac') {
+          const avgA = Math.round((lastResult.a) * 1000) / 1000;
+          const avgC = Math.round((lastResult.c) * 1000) / 1000;
+          html += `
+            <div class="height-input-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <label style="min-width:80px;">القسم ${i + 1}:</label>
+              <div style="flex:1;">
+                <label style="font-size:0.8rem;color:#666;">العرض العلوي (ai)</label>
+                <input type="number" class="slant-ai-input" data-index="${i}" value="${avgA}" step="any" min="0" style="width:100%;">
+              </div>
+              <div style="flex:1;">
+                <label style="font-size:0.8rem;color:#666;">العرض السفلي (ci)</label>
+                <input type="number" class="slant-ci-input" data-index="${i}" value="${avgC}" step="any" min="0" style="width:100%;">
+              </div>
+            </div>
+          `;
+        } else {
+          const avgC = Math.round((lastResult.c / n) * 1000) / 1000;
+          const avgD = Math.round((lastResult.d / n) * 1000) / 1000;
+          html += `
+            <div class="height-input-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <label style="min-width:80px;">القسم ${i + 1}:</label>
+              <div style="flex:1;">
+                <label style="font-size:0.8rem;color:#666;">الضلع الثالث (ci)</label>
+                <input type="number" class="slant-ci-input" data-index="${i}" value="${avgC}" step="any" min="0" style="width:100%;">
+              </div>
+              <div style="flex:1;">
+                <label style="font-size:0.8rem;color:#666;">الضلع الرابع (di)</label>
+                <input type="number" class="slant-di-input" data-index="${i}" value="${avgD}" step="any" min="0" style="width:100%;">
+              </div>
+            </div>
+          `;
+        }
+      }
+      list.innerHTML = html;
+    }
+
+    function calculateDivisions() {
+      if (!lastResult) return;
+      const dir = getDirection();
+
+      if (dir === 'ac') {
+        const aiInputs = document.querySelectorAll('.slant-ai-input');
+        const ciInputs = document.querySelectorAll('.slant-ci-input');
+        const sections_input = [];
+        for (let i = 0; i < aiInputs.length; i++) {
+          const ai = parseFloat(aiInputs[i].value) || 0;
+          const ci_val = parseFloat(ciInputs[i].value) || 0;
+          if (ai <= 0 || ci_val <= 0) { showToast('أدخل جميع القيم لكل قسم'); return; }
+          sections_input.push({ ai, ci: ci_val });
+        }
+        if (sections_input.length === 0) { showToast('أدخل قسم على الأقل'); return; }
+        const result = Calculations.divideBySlantCyclicAC(lastResult.a, lastResult.b, lastResult.c, lastResult.d, sections_input);
+        if (result.errors) { showToast(result.errors[0]); return; }
+        lastDivisions = result;
+      } else {
+        const ciInputs = document.querySelectorAll('.slant-ci-input');
+        const diInputs = document.querySelectorAll('.slant-di-input');
+        const slants = [];
+        for (let i = 0; i < ciInputs.length; i++) {
+          const ci = parseFloat(ciInputs[i].value) || 0;
+          const di = parseFloat(diInputs[i].value) || 0;
+          if (ci <= 0 || di <= 0) { showToast('أدخل جميع الأضلاع المائلة لكل قسم'); return; }
+          slants.push({ ci, di });
+        }
+        if (slants.length === 0) { showToast('أدخل قسم على الأقل'); return; }
+        const result = Calculations.divideBySlantCyclic(lastResult.a, lastResult.b, lastResult.c, lastResult.d, slants);
+        if (result.errors) { showToast(result.errors[0]); return; }
+        lastDivisions = result;
+      }
+
+      showDivisionResults(lastDivisions);
+      drawAllSections(lastDivisions);
+      document.getElementById('actionBtns').style.display = 'flex';
+    }
+
+    function showDivisionResults(result) {
+      const container = document.getElementById('divisionResults');
+      const dir = getDirection();
+      let html = `<h3 style="color:var(--primary-dark);margin:1.5rem 0 1rem;">الأقسام (${result.sections.length} قسم)</h3>`;
+      result.sections.forEach(sec => {
+        if (dir === 'ac') {
+          html += `
+            <div class="division-card">
+              <h4>القسم ${sec.index}</h4>
+              <canvas id="secCanvas${sec.index}" class="section-canvas"></canvas>
+              <div class="zoom-hint">اضغط للتكبير</div>
+              <div class="results-grid" style="margin-top:1rem;">
+                <div class="result-item"><div class="label">المساحة</div><div class="value">${sec.areaM2} <span class="unit">م²</span></div></div>
+                <div class="result-item"><div class="label">بالوحدات</div><div class="value">${sec.units.display}</div></div>
+                <div class="result-item"><div class="label">العرض العلوي</div><div class="value">${sec.a} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">العرض السفلي</div><div class="value">${sec.c} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">الضلع الأيمن</div><div class="value">${sec.b} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">الضلع الأيسر</div><div class="value">${sec.d} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">الارتفاع</div><div class="value">${sec.h} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">القطر</div><div class="value">${sec.diag1} <span class="unit">م</span></div></div>
+              </div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="division-card">
+              <h4>القسم ${sec.index}</h4>
+              <canvas id="secCanvas${sec.index}" class="section-canvas"></canvas>
+              <div class="zoom-hint">اضغط للتكبير</div>
+              <div class="results-grid" style="margin-top:1rem;">
+                <div class="result-item"><div class="label">المساحة</div><div class="value">${sec.areaM2} <span class="unit">م²</span></div></div>
+                <div class="result-item"><div class="label">بالوحدات</div><div class="value">${sec.units.display}</div></div>
+                <div class="result-item"><div class="label">الضلع العلوي</div><div class="value">${sec.a} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">الضلع السفلي</div><div class="value">${sec.b} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">الارتفاع</div><div class="value">${sec.h} <span class="unit">م</span></div></div>
+                <div class="result-item"><div class="label">القطر</div><div class="value">${sec.diag1} <span class="unit">م</span></div></div>
+              </div>
+            </div>
+          `;
+        }
+      });
+      container.innerHTML = html;
+      result.sections.forEach(sec => {
+        Diagrams.drawCyclicQuad(document.getElementById(`secCanvas${sec.index}`), { ...sec, diag1: sec.diag1, diag2: sec.diag2 }, null);
+      });
+    }
+
+    function drawAllSections(result) {
+      Diagrams.drawCyclicQuad(document.getElementById('allSectionsCanvas'), lastResult, result.sections);
+      document.getElementById('allSectionsCanvasContainer').style.display = 'block';
+    }
+
+    function saveData() {
+      if (!lastResult) return;
+      Export.saveFullData({
+        title: 'تقسيم الرباعي الدائري بالأضلاع المائلة',
+        inputs: {
+          'الضلع الأول': document.getElementById('inputA').value,
+          'الضلع الثاني': document.getElementById('inputB').value,
+          'الضلع الثالث': document.getElementById('inputC').value,
+          'الضلع الرابع': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null
+      });
+      Storage.save({ title: 'تقسيم الرباعي الدائري بالأضلاع المائلة', pageUrl: 'circular-quad-height.html', inputs: { a: lastResult.a, b: lastResult.b, c: lastResult.c, d: lastResult.d }, result: lastResult, units: lastResult.units });
+      showToast('تم حفظ البيانات بنجاح');
+    }
+
+    function showAllAsImage() {
+      if (!lastResult) return;
+      Export.exportFullPage({
+        title: 'تقسيم الرباعي الدائري بالأضلاع المائلة',
+        inputs: {
+          'الضلع الأول': document.getElementById('inputA').value,
+          'الضلع الثاني': document.getElementById('inputB').value,
+          'الضلع الثالث': document.getElementById('inputC').value,
+          'الضلع الرابع': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null,
+        mainCanvasId: 'mainCanvas',
+        sectionCanvasPrefix: 'secCanvas'
+      });
+      showToast('تم حفظ الصورة');
+    }
+
+    function printResults() {
+      if (!lastResult) return;
+      Export.printFullPage({
+        title: 'تقسيم الرباعي الدائري بالأضلاع المائلة',
+        inputs: {
+          'الضلع الأول': document.getElementById('inputA').value,
+          'الضلع الثاني': document.getElementById('inputB').value,
+          'الضلع الثالث': document.getElementById('inputC').value,
+          'الضلع الرابع': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null,
+        mainCanvasId: 'mainCanvas',
+        sectionCanvasPrefix: 'secCanvas'
+      });
+    }
+    function clearAll() {
+      ['inputA','inputB','inputC','inputD'].forEach(id => document.getElementById(id).value = '');
+      ['resultsBox','mainCanvasContainer'].forEach(id => document.getElementById(id).style.display = 'none');
+      document.getElementById('divisionSection').style.display = 'none';
+      document.getElementById('allSectionsCanvasContainer').style.display = 'none';
+      document.getElementById('actionBtns').style.display = 'none';
+      document.getElementById('divisionResults').innerHTML = '';
+      lastResult = null; lastDivisions = null;
+    }
+    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+    document.querySelectorAll('canvas').forEach(c => c.addEventListener('click', () => c.classList.toggle('zoomed')));
+  </script>
+</body>
+</html>

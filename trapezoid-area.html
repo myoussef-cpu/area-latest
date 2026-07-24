@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تقسيم شبه المنحرف بالمساحة</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a6b3c">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <a href="index.html" class="back-btn">→ الرئيسية</a>
+      <h1>تقسيم شبه المنحرف بالمساحة</h1>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="form-section">
+      <h2>أدخل أبعاد شبه المنحرف</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>القاعدة العلوية (م)</label>
+          <input type="number" id="inputA" placeholder="مثال: 10" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>القاعدة السفلية (م)</label>
+          <input type="number" id="inputB" placeholder="مثال: 16" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>الضلع المائل الأيمن (م)</label>
+          <input type="number" id="inputC" placeholder="مثال: 5" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label>الضلع المائل الأيسر (م)</label>
+          <input type="number" id="inputD" placeholder="مثال: 5" step="any" min="0">
+        </div>
+      </div>
+    </section>
+
+    <section class="results-box" id="resultsBox" style="display:none;">
+      <h3>النتائج</h3>
+      <div class="results-grid" id="resultsGrid"></div>
+    </section>
+
+    <section class="canvas-container" id="mainCanvasContainer" style="display:none;">
+      <canvas id="mainCanvas"></canvas>
+      <div class="zoom-hint">اضغط على الرسم للتكبير</div>
+    </section>
+
+    <section class="division-section" id="divisionSection" style="display:none;">
+      <h2>خيارات التقسيم</h2>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="divMode" value="equal" checked onchange="toggleDivMode()">
+          تقسيم بالتساوي
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="divMode" value="custom" onchange="toggleDivMode()">
+          إدخال مساحة كل قسم
+        </label>
+      </div>
+
+      <div id="equalDivInputs">
+        <div class="form-group" style="max-width:300px;">
+          <label>عدد الأقسام</label>
+          <input type="number" id="numSections" value="2" min="2" max="50" onchange="updateCustomInputs()">
+        </div>
+      </div>
+
+      <div id="customDivInputs" style="display:none;">
+        <p id="totalAreaText" style="margin-bottom:10px;font-weight:600;color:var(--primary-dark);"></p>
+        <div id="customInputsList"></div>
+        <p id="remainingText" style="margin-top:8px;color:var(--text-light);font-size:0.9rem;"></p>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:1rem;" onclick="calculateDivisions()">حساب الأقسام</button>
+
+      <div id="divisionResults" class="division-results"></div>
+
+      <div class="action-buttons" id="actionBtns" style="display:none;">
+        <button class="btn btn-primary" onclick="saveData()">💾 حفظ البيانات</button>
+        <button class="btn btn-secondary" onclick="showAllAsImage()">🖼️ عرض الكل كصورة</button>
+        <button class="btn btn-outline" onclick="printResults()">🖨️ طباعة</button>
+        <button class="btn btn-danger" onclick="clearAll()">🗑️ مسح الكل</button>
+      </div>
+    </section>
+
+    <section class="canvas-container" id="allSectionsCanvasContainer" style="display:none;">
+      <canvas id="allSectionsCanvas"></canvas>
+      <div class="zoom-hint">عرض جميع الأقسام معاً - اضغط للتكبير</div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/calculations.js"></script>
+  <script src="js/diagrams.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/export.js"></script>
+  <script>
+    let lastResult = null;
+    let lastDivisions = null;
+
+    const inputs = ['inputA', 'inputB', 'inputC', 'inputD'];
+    inputs.forEach(id => {
+      document.getElementById(id).addEventListener('input', autoCalculate);
+    });
+
+    function autoCalculate() {
+      const a = document.getElementById('inputA').value;
+      const b = document.getElementById('inputB').value;
+      const c = document.getElementById('inputC').value;
+      const d = document.getElementById('inputD').value;
+
+      if (!a || !b || !c || !d) {
+        document.getElementById('resultsBox').style.display = 'none';
+        document.getElementById('mainCanvasContainer').style.display = 'none';
+        document.getElementById('divisionSection').style.display = 'none';
+        return;
+      }
+
+      const result = Calculations.trapezoidCalc(a, b, c, d);
+      if (result.errors) {
+        document.getElementById('resultsBox').style.display = 'none';
+        return;
+      }
+
+      lastResult = result;
+      showResults(result);
+      drawMainDiagram(result);
+      document.getElementById('divisionSection').style.display = 'block';
+      updateCustomInputs();
+    }
+
+    function showResults(r) {
+      const grid = document.getElementById('resultsGrid');
+      grid.innerHTML = `
+        <div class="result-item"><div class="label">المساحة الكلية</div><div class="value">${r.areaM2} <span class="unit">م²</span></div></div>
+        <div class="result-item"><div class="label">الفدان</div><div class="value">${r.units.feddan} <span class="unit">فدان</span></div></div>
+        <div class="result-item"><div class="label">القيراط</div><div class="value">${r.units.qirat} <span class="unit">قيراط</span></div></div>
+        <div class="result-item"><div class="label">السهم</div><div class="value">${r.units.sah} <span class="unit">سهم</span></div></div>
+        <div class="result-item"><div class="label">الارتفاع</div><div class="value">${r.h} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">x1 (المسافة الأفقية اليمنى)</div><div class="value">${r.x1} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">x2 (المسافة الأفقية اليسرى)</div><div class="value">${r.x2} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">القطر الأول</div><div class="value">${r.diag1} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">القطر الثاني</div><div class="value">${r.diag2} <span class="unit">م</span></div></div>
+        <div class="result-item"><div class="label">المحيط</div><div class="value">${r.perimeter} <span class="unit">م</span></div></div>
+      `;
+      document.getElementById('resultsBox').style.display = 'block';
+    }
+
+    function drawMainDiagram(r) {
+      const canvas = document.getElementById('mainCanvas');
+      Diagrams.drawTrapezoid(canvas, r, null);
+      document.getElementById('mainCanvasContainer').style.display = 'block';
+    }
+
+    function toggleDivMode() {
+      const mode = document.querySelector('input[name="divMode"]:checked').value;
+      document.getElementById('equalDivInputs').style.display = mode === 'equal' ? 'block' : 'none';
+      document.getElementById('customDivInputs').style.display = mode === 'custom' ? 'block' : 'none';
+      if (mode === 'custom') updateCustomInputs();
+    }
+
+    function updateCustomInputs() {
+      if (!lastResult) return;
+      const mode = document.querySelector('input[name="divMode"]:checked').value;
+      if (mode !== 'custom') return;
+
+      const n = parseInt(document.getElementById('numSections').value) || 2;
+      const list = document.getElementById('customInputsList');
+      document.getElementById('totalAreaText').textContent = `المساحة الكلية: ${lastResult.areaM2} م²`;
+
+      let html = '';
+      for (let i = 0; i < n; i++) {
+        html += `
+          <div class="area-input-row">
+            <label>القسم ${i + 1} (م²):</label>
+            <input type="number" class="custom-area-input" data-index="${i}" placeholder="مساحة القسم ${i + 1}" step="any" min="0" onchange="updateRemaining()">
+          </div>
+        `;
+      }
+      list.innerHTML = html;
+      updateRemaining();
+    }
+
+    function updateRemaining() {
+      if (!lastResult) return;
+      const inputs = document.querySelectorAll('.custom-area-input');
+      let total = 0;
+      inputs.forEach(inp => { total += parseFloat(inp.value) || 0; });
+      const remaining = lastResult.areaM2 - total;
+      document.getElementById('remainingText').textContent = `المتبقي: ${Math.round(remaining * 1000) / 1000} م²`;
+      document.getElementById('remainingText').style.color = Math.abs(remaining) < 0.001 ? 'var(--primary)' : remaining < 0 ? '#d32f2f' : 'var(--text-light)';
+    }
+
+    function calculateDivisions() {
+      if (!lastResult) return;
+      const mode = document.querySelector('input[name="divMode"]:checked').value;
+
+      let result;
+      if (mode === 'equal') {
+        const n = parseInt(document.getElementById('numSections').value) || 2;
+        result = Calculations.divideEqualTrapezoid(lastResult.a, lastResult.b, lastResult.c, lastResult.d, n);
+      } else {
+        const inputs = document.querySelectorAll('.custom-area-input');
+        const areas = Array.from(inputs).map(inp => parseFloat(inp.value) || 0).filter(v => v > 0);
+        if (areas.length === 0) {
+          showToast('أدخل مساحة على الأقل');
+          return;
+        }
+        result = Calculations.divideByAreaTrapezoid(lastResult.a, lastResult.b, lastResult.c, lastResult.d, areas);
+      }
+
+      if (result.errors) {
+        showToast(result.errors[0]);
+        return;
+      }
+
+      lastDivisions = result;
+      showDivisionResults(result);
+      drawAllSections(result);
+      document.getElementById('actionBtns').style.display = 'flex';
+    }
+
+    function showDivisionResults(result) {
+      const container = document.getElementById('divisionResults');
+      let html = `<h3 style="color:var(--primary-dark);margin:1.5rem 0 1rem;">الأقسام (${result.sections.length} قسم)</h3>`;
+
+      result.sections.forEach(sec => {
+        html += `
+          <div class="division-card">
+            <h4>القسم ${sec.index}</h4>
+            <canvas id="secCanvas${sec.index}" class="section-canvas"></canvas>
+            <div class="zoom-hint">اضغط للتكبير</div>
+            <div class="results-grid" style="margin-top:1rem;">
+              <div class="result-item"><div class="label">المساحة</div><div class="value">${sec.areaM2} <span class="unit">م²</span></div></div>
+              <div class="result-item"><div class="label">بالوحدات</div><div class="value">${sec.units.display}</div></div>
+              <div class="result-item"><div class="label">القاعدة العلوية</div><div class="value">${sec.a} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">القاعدة السفلية</div><div class="value">${sec.b} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الضلع الأيمن</div><div class="value">${sec.c} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الضلع الأيسر</div><div class="value">${sec.d} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">الارتفاع</div><div class="value">${sec.h} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">القطر الأول</div><div class="value">${sec.diag1} <span class="unit">م</span></div></div>
+              <div class="result-item"><div class="label">القطر الثاني</div><div class="value">${sec.diag2} <span class="unit">م</span></div></div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+
+      result.sections.forEach(sec => {
+        const canvas = document.getElementById(`secCanvas${sec.index}`);
+        Diagrams.drawTrapezoidSection(canvas, sec, sec.index, lastResult.h, lastResult.a, lastResult.b);
+      });
+    }
+
+    function drawAllSections(result) {
+      const canvas = document.getElementById('allSectionsCanvas');
+      Diagrams.drawTrapezoid(canvas, lastResult, result.sections, lastResult.h);
+      document.getElementById('allSectionsCanvasContainer').style.display = 'block';
+    }
+
+    function saveData() {
+      if (!lastResult) return;
+      Export.saveFullData({
+        title: 'تقسيم شبه المنحرف بالمساحة',
+        inputs: {
+          'القاعدة العلوية': document.getElementById('inputA').value,
+          'القاعدة السفلية': document.getElementById('inputB').value,
+          'الضلع الأيمن': document.getElementById('inputC').value,
+          'الضلع الأيسر': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null
+      });
+      Storage.save({
+        title: 'تقسيم شبه المنحرف بالمساحة',
+        pageUrl: 'trapezoid-area.html',
+        inputs: { a: lastResult.a, b: lastResult.b, c: lastResult.c, d: lastResult.d },
+        result: lastResult,
+        units: lastResult.units
+      });
+      showToast('تم حفظ البيانات بنجاح');
+    }
+
+    function showAllAsImage() {
+      if (!lastResult) return;
+      Export.exportFullPage({
+        title: 'تقسيم شبه المنحرف بالمساحة',
+        inputs: {
+          'القاعدة العلوية': document.getElementById('inputA').value,
+          'القاعدة السفلية': document.getElementById('inputB').value,
+          'الضلع الأيمن': document.getElementById('inputC').value,
+          'الضلع الأيسر': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null,
+        mainCanvasId: 'mainCanvas',
+        sectionCanvasPrefix: 'secCanvas'
+      });
+      showToast('تم حفظ الصورة');
+    }
+
+    function printResults() {
+      if (!lastResult) return;
+      Export.printFullPage({
+        title: 'تقسيم شبه المنحرف بالمساحة',
+        inputs: {
+          'القاعدة العلوية': document.getElementById('inputA').value,
+          'القاعدة السفلية': document.getElementById('inputB').value,
+          'الضلع الأيمن': document.getElementById('inputC').value,
+          'الضلع الأيسر': document.getElementById('inputD').value
+        },
+        results: lastResult,
+        sections: lastDivisions ? lastDivisions.sections : null,
+        mainCanvasId: 'mainCanvas',
+        sectionCanvasPrefix: 'secCanvas'
+      });
+    }
+
+    function clearAll() {
+      document.getElementById('inputA').value = '';
+      document.getElementById('inputB').value = '';
+      document.getElementById('inputC').value = '';
+      document.getElementById('inputD').value = '';
+      document.getElementById('resultsBox').style.display = 'none';
+      document.getElementById('mainCanvasContainer').style.display = 'none';
+      document.getElementById('divisionSection').style.display = 'none';
+      document.getElementById('allSectionsCanvasContainer').style.display = 'none';
+      document.getElementById('actionBtns').style.display = 'none';
+      document.getElementById('divisionResults').innerHTML = '';
+      lastResult = null;
+      lastDivisions = null;
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    document.querySelectorAll('canvas').forEach(c => {
+      c.addEventListener('click', () => c.classList.toggle('zoomed'));
+    });
+  </script>
+</body>
+</html>
