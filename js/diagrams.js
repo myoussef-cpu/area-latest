@@ -374,12 +374,20 @@ const Diagrams = {
     const maxCanvasW = Math.min(700, window.innerWidth - 80);
     const maxCanvasH = 500;
 
-    const { a, b, c, d, h, diag1, diag2, areaM2 } = data;
+    const { a, b, c, d, h, diag1, diag2 } = data;
 
-    const scale = this.getScale(Math.max(a, b, c, d) * 1.5, h * 1.2, maxCanvasW, maxCanvasH);
+    const leftTopX = 0;
+    const leftBottomX = Math.sqrt(Math.max(0, d * d - h * h));
 
-    const canvasW = Math.max(a, b, c, d) * scale + 200;
-    const canvasH = h * scale + 180;
+    const minX = Math.min(leftTopX, leftBottomX);
+    const maxX = Math.max(leftTopX + a, leftBottomX + c);
+    const shapeW = maxX - minX;
+    const shapeH = h;
+
+    const scale = this.getScale(shapeW, shapeH, maxCanvasW, maxCanvasH);
+
+    const canvasW = shapeW * scale + 200;
+    const canvasH = shapeH * scale + 180;
 
     canvas.width = canvasW * dpr;
     canvas.height = canvasH * dpr;
@@ -388,29 +396,14 @@ const Diagrams = {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, canvasW, canvasH);
 
-    const centerX = canvasW / 2;
-    const centerY = canvasH / 2 + 10;
-    const radius = Math.min(a, b, c, d) * scale * 0.8;
-
-    ctx.save();
-    ctx.strokeStyle = '#90caf9';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius * 1.2, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    const angleA = -Math.PI / 2 - 0.3;
-    const angleB = angleA + (a / (a + b + c + d)) * Math.PI * 2;
-    const angleC = angleB + (b / (a + b + c + d)) * Math.PI * 2;
-    const angleD = angleC + (c / (a + b + c + d)) * Math.PI * 2;
+    const offsetX = 100 - minX * scale;
+    const offsetY = 90;
 
     const pts = [
-      { x: centerX + radius * Math.cos(angleA), y: centerY + radius * Math.sin(angleA) },
-      { x: centerX + radius * Math.cos(angleB), y: centerY + radius * Math.sin(angleB) },
-      { x: centerX + radius * Math.cos(angleC), y: centerY + radius * Math.sin(angleC) },
-      { x: centerX + radius * Math.cos(angleD), y: centerY + radius * Math.sin(angleD) }
+      { x: offsetX + leftTopX * scale, y: offsetY },
+      { x: offsetX + (leftTopX + a) * scale, y: offsetY },
+      { x: offsetX + (leftBottomX + c) * scale, y: offsetY + h * scale },
+      { x: offsetX + leftBottomX * scale, y: offsetY + h * scale }
     ];
 
     ctx.fillStyle = this.COLORS.shapeFill;
@@ -432,10 +425,10 @@ const Diagrams = {
     this.drawDashedLine(ctx, pts[1].x, pts[1].y, pts[3].x, pts[3].y, this.COLORS.diag);
 
     const labels = [
-      { text: `${a}`, x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 - 14 },
-      { text: `${b}`, x: (pts[1].x + pts[2].x) / 2 + 25, y: (pts[1].y + pts[2].y) / 2 },
-      { text: `${c}`, x: (pts[2].x + pts[3].x) / 2, y: (pts[2].y + pts[3].y) / 2 + 14 },
-      { text: `${d}`, x: (pts[3].x + pts[0].x) / 2 - 25, y: (pts[3].y + pts[0].y) / 2 }
+      { text: `${a}`, x: (pts[0].x + pts[1].x) / 2, y: pts[0].y - 14 },
+      { text: `${b}`, x: (pts[1].x + pts[2].x) / 2 + 30, y: (pts[1].y + pts[2].y) / 2 },
+      { text: `${c}`, x: (pts[3].x + pts[2].x) / 2, y: pts[3].y + 16 },
+      { text: `${d}`, x: (pts[0].x + pts[3].x) / 2 - 30, y: (pts[0].y + pts[3].y) / 2 }
     ];
 
     labels.forEach(l => {
@@ -445,16 +438,163 @@ const Diagrams = {
     this.drawLabel(ctx, `d1=${diag1}`, (pts[0].x + pts[2].x) / 2 - 20, (pts[0].y + pts[2].y) / 2 - 10, 'rgba(21,101,192,0.15)', this.COLORS.diag, 9);
     this.drawLabel(ctx, `d2=${diag2}`, (pts[1].x + pts[3].x) / 2 + 20, (pts[1].y + pts[3].y) / 2 - 10, 'rgba(21,101,192,0.15)', this.COLORS.diag, 9);
 
-    const midDiagX = (pts[0].x + pts[2].x) / 2;
-    const hx = midDiagX + 16;
+    const hx = (pts[0].x + pts[3].x) / 2 + (pts[1].x - pts[0].x) * 0.15;
     this.drawHeightLine(ctx, hx, pts[0].y, pts[3].y);
     this.drawLabel(ctx, `h=${h}`, hx + 20, (pts[0].y + pts[3].y) / 2, this.COLORS.labelBgHeight, this.COLORS.height, 9);
 
+    if (divisions && divisions.length > 0) {
+      for (let i = 0; i < divisions.length; i++) {
+        const div = divisions[i];
+        const yTop = div.yTop || 0;
+        const yBot = div.yBottom !== undefined ? div.yBottom : (yTop + (div.h || 0));
+
+        const ltx = offsetX + this.interpolateEdge(leftTopX, leftBottomX, h, yTop) * scale;
+        const lbx = offsetX + this.interpolateEdge(leftTopX, leftBottomX, h, yBot) * scale;
+
+        const wTopP = this.widthAtHeight(h, a, c, yTop);
+        const wBotP = this.widthAtHeight(h, a, c, yBot);
+
+        const rtX = ltx + wTopP * scale;
+        const rbX = lbx + wBotP * scale;
+
+        const yTopP = offsetY + yTop * scale;
+        const yBotP = offsetY + yBot * scale;
+
+        ctx.save();
+        ctx.fillStyle = `hsla(${(i * 360 / divisions.length) % 360}, 50%, 95%, 0.5)`;
+        ctx.beginPath();
+        ctx.moveTo(ltx, yTopP);
+        ctx.lineTo(rtX, yTopP);
+        ctx.lineTo(rbX, yBotP);
+        ctx.lineTo(lbx, yBotP);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = this.COLORS.division;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 3]);
+        ctx.stroke();
+        ctx.restore();
+
+        if (i > 0) {
+          ctx.save();
+          ctx.strokeStyle = this.COLORS.division;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(ltx, yTopP);
+          ctx.lineTo(rtX, yTopP);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        const secCenterX = (ltx + rtX + rbX + lbx) / 4;
+        const secCenterY = (yTopP + yBotP) / 2;
+        this.drawLabel(ctx, `${i + 1}`, secCenterX, secCenterY, 'rgba(230,81,0,0.8)', '#fff', 16);
+      }
+    }
+
     ctx.save();
     ctx.fillStyle = '#333';
-    ctx.font = 'bold 12px Segoe UI, Tahoma, sans-serif';
+    ctx.font = 'bold 14px Segoe UI, Tahoma, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('الرباعي الدائري', canvasW / 2, 18);
+    ctx.restore();
+  },
+
+  drawCyclicQuadSection(canvas, section, index, origData) {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+
+    const maxCanvasW = Math.min(500, window.innerWidth - 60);
+    const maxCanvasH = 350;
+
+    const hTotal = origData.h;
+    const leftTopX = 0;
+    const leftBottomX = Math.sqrt(Math.max(0, origData.d * origData.d - hTotal * hTotal));
+
+    const yTop = section.yTop || 0;
+    const yBottom = section.yBottom !== undefined ? section.yBottom : (yTop + section.h);
+
+    const wTop = this.widthAtHeight(hTotal, origData.a, origData.c, yTop);
+    const wBottom = this.widthAtHeight(hTotal, origData.a, origData.c, yBottom);
+
+    const ltx = this.interpolateEdge(leftTopX, leftBottomX, hTotal, yTop);
+    const lbx = this.interpolateEdge(leftTopX, leftBottomX, hTotal, yBottom);
+
+    const pts = [
+      { x: ltx, y: yTop },
+      { x: ltx + wTop, y: yTop },
+      { x: lbx + wBottom, y: yBottom },
+      { x: lbx, y: yBottom }
+    ];
+
+    const minX = Math.min(ltx, lbx);
+    const maxX = Math.max(ltx + wTop, lbx + wBottom);
+    const totalW = maxX - minX;
+    const secH = yBottom - yTop;
+
+    const scale = this.getScale(totalW, secH, maxCanvasW, maxCanvasH);
+
+    const canvasW = totalW * scale + 140;
+    const canvasH = secH * scale + 100;
+
+    canvas.width = canvasW * dpr;
+    canvas.height = canvasH * dpr;
+    canvas.style.width = canvasW + 'px';
+    canvas.style.height = canvasH + 'px';
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    const ox = 70 - minX * scale;
+    const oy = 30;
+
+    const dPts = pts.map(p => ({ x: ox + p.x * scale, y: oy + (p.y - yTop) * scale }));
+
+    ctx.fillStyle = `hsla(${((index - 1) * 60) % 360}, 40%, 95%, 0.6)`;
+    ctx.beginPath();
+    ctx.moveTo(dPts[0].x, dPts[0].y);
+    for (let i = 1; i < dPts.length; i++) ctx.lineTo(dPts[i].x, dPts[i].y);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = this.COLORS.shape;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(dPts[0].x, dPts[0].y);
+    for (let i = 1; i < dPts.length; i++) ctx.lineTo(dPts[i].x, dPts[i].y);
+    ctx.closePath();
+    ctx.stroke();
+
+    this.drawDashedLine(ctx, dPts[0].x, dPts[0].y, dPts[2].x, dPts[2].y, this.COLORS.diag);
+    this.drawDashedLine(ctx, dPts[1].x, dPts[1].y, dPts[3].x, dPts[3].y, this.COLORS.diag);
+
+    const hx = dPts[0].x + (dPts[3].x - dPts[0].x) * 0.3;
+    this.drawHeightLine(ctx, hx, dPts[0].y, dPts[3].y);
+    this.drawLabel(ctx, `h=${section.h}`, hx + 16, (dPts[0].y + dPts[3].y) / 2, this.COLORS.labelBgHeight, this.COLORS.height, 9);
+
+    const isAC = section.leftTopX !== undefined;
+    const botWidth = isAC ? section.c : section.b;
+    const rightEdge = isAC ? section.b : section.c;
+
+    this.drawLabel(ctx, `${section.a}`, (dPts[0].x + dPts[1].x) / 2, dPts[0].y - 12, 'rgba(26,107,60,0.15)', this.COLORS.shape, 10);
+    this.drawLabel(ctx, `${botWidth}`, (dPts[2].x + dPts[3].x) / 2, dPts[3].y + 14, 'rgba(26,107,60,0.15)', this.COLORS.shape, 10);
+
+    const leftMidX = (dPts[0].x + dPts[3].x) / 2 - 22;
+    const leftMidY = (dPts[0].y + dPts[3].y) / 2;
+    this.drawLabel(ctx, `d=${section.d}`, leftMidX, leftMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
+
+    const rightMidX = (dPts[1].x + dPts[2].x) / 2 + 22;
+    const rightMidY = (dPts[1].y + dPts[2].y) / 2;
+    this.drawLabel(ctx, `c=${rightEdge}`, rightMidX, rightMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
+
+    this.drawLabel(ctx, `d1=${section.diag1}`, (dPts[0].x + dPts[2].x) / 2 - 8, (dPts[0].y + dPts[2].y) / 2 - 8, 'rgba(21,101,192,0.15)', this.COLORS.diag, 8);
+    this.drawLabel(ctx, `d2=${section.diag2}`, (dPts[1].x + dPts[3].x) / 2 + 8, (dPts[1].y + dPts[3].y) / 2 - 8, 'rgba(21,101,192,0.15)', this.COLORS.diag, 8);
+
+    ctx.save();
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 11px Segoe UI, Tahoma, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`القسم ${index}`, canvasW / 2, 16);
     ctx.restore();
   },
 

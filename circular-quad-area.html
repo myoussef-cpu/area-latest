@@ -231,7 +231,7 @@
       container.innerHTML = html;
       result.sections.forEach(sec => {
         const canvas = document.getElementById(`secCanvas${sec.index}`);
-        Diagrams.drawCyclicQuad(canvas, { ...sec, diag1: sec.diag1, diag2: sec.diag2 }, null);
+        Diagrams.drawCyclicQuadSection(canvas, sec, sec.index, lastResult);
       });
     }
 

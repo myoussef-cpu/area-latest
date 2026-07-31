@@ -299,7 +299,8 @@
       });
       container.innerHTML = html;
       result.sections.forEach(sec => {
-        Diagrams.drawCyclicQuad(document.getElementById(`secCanvas${sec.index}`), { ...sec, diag1: sec.diag1, diag2: sec.diag2 }, null);
+        const canvas = document.getElementById(`secCanvas${sec.index}`);
+        Diagrams.drawCyclicQuadSection(canvas, sec, sec.index, lastResult);
       });
     }
 
