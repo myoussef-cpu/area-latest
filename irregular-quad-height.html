@@ -305,7 +305,8 @@
       });
       container.innerHTML = html;
       result.sections.forEach(sec => {
-        Diagrams.drawIrregularQuad(document.getElementById(`secCanvas${sec.index}`), { ...sec, diag2: sec.diag1 }, null);
+        const canvas = document.getElementById(`secCanvas${sec.index}`);
+        Diagrams.drawIrregularQuadSection(canvas, sec, sec.index);
       });
     }
 

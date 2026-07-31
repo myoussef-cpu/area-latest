@@ -677,14 +677,48 @@ const Diagrams = {
     this.drawLabel(ctx, `Q=${diag}`, (diagLeft + diagRight) / 2, topY + 12, 'rgba(156,39,176,0.15)', '#7b1fa2', 9);
 
     if (divisions && divisions.length > 0) {
+      const spanY = botY - topY;
+      const refW = (divisions[0] && divisions[0].a) || diag;
+      const wScale = (diagRight - diagLeft) / refW;
+
       for (let i = 0; i < divisions.length; i++) {
         const div = divisions[i];
-        const secTopY = oy + (div.yTop || 0) * scale;
-        const secBotY = oy + (div.yBottom || 0) * scale;
-        const secCenterX = canvasW / 2;
-        const secCenterY = (secTopY + secBotY) / 2;
+        const fracTop = (div.yTop || 0) / totalH;
+        const fracBot = (div.yBottom || 0) / totalH;
+        const secTopY = topY + fracTop * spanY;
+        const secBotY = topY + fracBot * spanY;
+        const wTop = div.a * wScale;
+        const wBot = div.b * wScale;
+        const lx = diagLeft;
 
-        this.drawLabel(ctx, `${i + 1}`, secCenterX, secCenterY, 'rgba(230,81,0,0.8)', '#fff', 14);
+        ctx.save();
+        ctx.fillStyle = `hsla(${(i * 360 / divisions.length) % 360}, 50%, 95%, 0.5)`;
+        ctx.beginPath();
+        ctx.moveTo(lx, secTopY);
+        ctx.lineTo(lx + wTop, secTopY);
+        ctx.lineTo(lx + wBot, secBotY);
+        ctx.lineTo(lx, secBotY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = this.COLORS.division;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 3]);
+        ctx.stroke();
+        ctx.restore();
+
+        if (i > 0) {
+          ctx.save();
+          ctx.strokeStyle = this.COLORS.division;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(lx, secTopY);
+          ctx.lineTo(lx + wTop, secTopY);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        this.drawLabel(ctx, `${i + 1}`, lx + wTop / 2, (secTopY + secBotY) / 2, 'rgba(230,81,0,0.8)', '#fff', 14);
       }
     }
 
@@ -693,6 +727,107 @@ const Diagrams = {
     ctx.font = 'bold 12px Segoe UI, Tahoma, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('الرباعي غير المنتظم', canvasW / 2, 18);
+    ctx.restore();
+  },
+
+  drawIrregularQuadSection(canvas, section, index) {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+
+    const maxCanvasW = Math.min(500, window.innerWidth - 60);
+    const maxCanvasH = 350;
+
+    const useStored = section.leftTopX !== undefined;
+
+    let pts;
+    if (useStored) {
+      const yTop = section.yTop || 0;
+      const yBottom = section.yBottom !== undefined ? section.yBottom : (yTop + section.h);
+      pts = [
+        { x: section.leftTopX, y: yTop },
+        { x: section.rightTopX, y: yTop },
+        { x: section.rightBotX, y: yBottom },
+        { x: section.leftBotX, y: yBottom }
+      ];
+    } else {
+      const secH = section.h;
+      const delta = Math.sqrt(Math.max(0, section.c * section.c - secH * secH));
+      pts = [
+        { x: 0, y: 0 },
+        { x: section.a, y: 0 },
+        { x: delta + section.b, y: secH },
+        { x: delta, y: secH }
+      ];
+    }
+
+    const minX = Math.min(...pts.map(p => p.x));
+    const maxX = Math.max(...pts.map(p => p.x));
+    const minY = Math.min(...pts.map(p => p.y));
+    const maxY = Math.max(...pts.map(p => p.y));
+    const totalW = maxX - minX;
+    const secH = maxY - minY;
+
+    const scale = this.getScale(totalW, secH, maxCanvasW, maxCanvasH);
+
+    const canvasW = totalW * scale + 140;
+    const canvasH = secH * scale + 100;
+
+    canvas.width = canvasW * dpr;
+    canvas.height = canvasH * dpr;
+    canvas.style.width = canvasW + 'px';
+    canvas.style.height = canvasH + 'px';
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    const ox = 70 - minX * scale;
+    const oy = 30 - minY * scale;
+
+    const dPts = pts.map(p => ({ x: ox + p.x * scale, y: oy + p.y * scale }));
+
+    ctx.fillStyle = `hsla(${((index - 1) * 60) % 360}, 40%, 95%, 0.6)`;
+    ctx.beginPath();
+    ctx.moveTo(dPts[0].x, dPts[0].y);
+    for (let i = 1; i < dPts.length; i++) ctx.lineTo(dPts[i].x, dPts[i].y);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = this.COLORS.shape;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(dPts[0].x, dPts[0].y);
+    for (let i = 1; i < dPts.length; i++) ctx.lineTo(dPts[i].x, dPts[i].y);
+    ctx.closePath();
+    ctx.stroke();
+
+    this.drawDashedLine(ctx, dPts[0].x, dPts[0].y, dPts[2].x, dPts[2].y, this.COLORS.diag);
+    this.drawDashedLine(ctx, dPts[1].x, dPts[1].y, dPts[3].x, dPts[3].y, this.COLORS.diag);
+
+    const hx = dPts[0].x + (dPts[3].x - dPts[0].x) * 0.3;
+    this.drawHeightLine(ctx, hx, dPts[0].y, dPts[3].y);
+    this.drawLabel(ctx, `h=${section.h}`, hx + 16, (dPts[0].y + dPts[3].y) / 2, this.COLORS.labelBgHeight, this.COLORS.height, 9);
+
+    const botWidth = useStored ? section.c : section.b;
+    const rightEdge = useStored ? section.b : section.c;
+
+    this.drawLabel(ctx, `${section.a}`, (dPts[0].x + dPts[1].x) / 2, dPts[0].y - 12, 'rgba(26,107,60,0.15)', this.COLORS.shape, 10);
+    this.drawLabel(ctx, `${botWidth}`, (dPts[2].x + dPts[3].x) / 2, dPts[3].y + 14, 'rgba(26,107,60,0.15)', this.COLORS.shape, 10);
+
+    const leftMidX = (dPts[0].x + dPts[3].x) / 2 - 22;
+    const leftMidY = (dPts[0].y + dPts[3].y) / 2;
+    this.drawLabel(ctx, `d=${section.d}`, leftMidX, leftMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
+
+    const rightMidX = (dPts[1].x + dPts[2].x) / 2 + 22;
+    const rightMidY = (dPts[1].y + dPts[2].y) / 2;
+    this.drawLabel(ctx, `c=${rightEdge}`, rightMidX, rightMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
+
+    this.drawLabel(ctx, `d1=${section.diag1}`, (dPts[0].x + dPts[2].x) / 2 - 8, (dPts[0].y + dPts[2].y) / 2 - 8, 'rgba(21,101,192,0.15)', this.COLORS.diag, 8);
+    this.drawLabel(ctx, `d2=${section.diag2}`, (dPts[1].x + dPts[3].x) / 2 + 8, (dPts[1].y + dPts[3].y) / 2 - 8, 'rgba(21,101,192,0.15)', this.COLORS.diag, 8);
+
+    ctx.save();
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 11px Segoe UI, Tahoma, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`القسم ${index}`, canvasW / 2, 16);
     ctx.restore();
   },
 
