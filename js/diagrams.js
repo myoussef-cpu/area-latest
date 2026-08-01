@@ -574,18 +574,20 @@ const Diagrams = {
 
     const isAC = section.leftTopX !== undefined;
     const botWidth = isAC ? section.c : section.b;
-    const rightEdge = isAC ? section.b : section.c;
+
+    const rightLabel = Math.round((origData.b * secH / hTotal) * 1000) / 1000;
+    const leftLabel = Math.round((origData.d * secH / hTotal) * 1000) / 1000;
 
     this.drawLabel(ctx, `${section.a}`, (dPts[0].x + dPts[1].x) / 2, dPts[0].y - 12, 'rgba(26,107,60,0.15)', this.COLORS.shape, 10);
     this.drawLabel(ctx, `${botWidth}`, (dPts[2].x + dPts[3].x) / 2, dPts[3].y + 14, 'rgba(26,107,60,0.15)', this.COLORS.shape, 10);
 
     const leftMidX = (dPts[0].x + dPts[3].x) / 2 - 22;
     const leftMidY = (dPts[0].y + dPts[3].y) / 2;
-    this.drawLabel(ctx, `d=${section.d}`, leftMidX, leftMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
+    this.drawLabel(ctx, `d=${leftLabel}`, leftMidX, leftMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
 
     const rightMidX = (dPts[1].x + dPts[2].x) / 2 + 22;
     const rightMidY = (dPts[1].y + dPts[2].y) / 2;
-    this.drawLabel(ctx, `c=${rightEdge}`, rightMidX, rightMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
+    this.drawLabel(ctx, `c=${rightLabel}`, rightMidX, rightMidY, 'rgba(26,107,60,0.15)', this.COLORS.shape, 9);
 
     this.drawLabel(ctx, `d1=${section.diag1}`, (dPts[0].x + dPts[2].x) / 2 - 8, (dPts[0].y + dPts[2].y) / 2 - 8, 'rgba(21,101,192,0.15)', this.COLORS.diag, 8);
     this.drawLabel(ctx, `d2=${section.diag2}`, (dPts[1].x + dPts[3].x) / 2 + 8, (dPts[1].y + dPts[3].y) / 2 - 8, 'rgba(21,101,192,0.15)', this.COLORS.diag, 8);
